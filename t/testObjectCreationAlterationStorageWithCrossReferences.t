@@ -18,6 +18,10 @@ BEGIN {
  $DBH = $DBC->getDBHandle;
 }
 
+SKIP: {
+        skip "! Cannot test without a database connection - please adjust DBConnector.pm's connection parameters and \'make test\' again", 1 unless $DBC->can_connect;
+
+
 my $autodb = Class::AutoDB->new(
 		                  -dsn=>"DBI:$DBConnector::DB_NAME:database=$DBConnector::DB_DATABASE;host=$DBConnector::DB_SERVER",
                           -user=>$DBConnector::DB_USER,
@@ -71,5 +75,5 @@ my $trudy_lives_again = $cursor->{objects}->[0];
 my $bill_lives_again = $trudy_lives_again->friends([$bill]);
 is($bill_lives_again->[0]->name, "Bill");
 #TODO: test with outsider object
-
+}
 }

@@ -14,6 +14,8 @@ use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS %AUTODB);
 my  $DBC = new DBConnector;
 my  $DBH = $DBC->getDBHandle;
 
+SKIP: {
+        skip "! Cannot test without a database connection - please adjust DBConnector.pm's connection parameters and \'make test\' again", 1 unless $DBC->can_connect;
 
 # create autodb objects without a class behind it (Class::AutoDB::auto_register not called)
 {
@@ -104,6 +106,6 @@ ok(exists $result->{_autodb});
 ok(exists $result->{person});
 ok(exists $result->{person_friends});
 
-1;
+}
 
 

@@ -3,10 +3,35 @@
 
 package DBConnector;
 use strict;
-use vars qw($DB_SERVER $DB_DATABASE $DB_USER $DB_PASS $DB_DRIVER $DB_NAME @ISA);
+use vars qw($noConnectionFile $DB_SERVER $DB_DATABASE $DB_USER $DB_PASS $DB_DRIVER $DB_NAME @ISA);
 use DBI;
 use Class::AutoClass;
 @ISA = qw(Class::AutoClass);
+
+
+###############################################################################
+# _mark_noconnect
+#
+# writes a file named ".noDBConnnection" in this directory so that both
+# testing class and instance methods can find out if we have a DB connection
+###############################################################################
+sub _mark_noconnect {
+  $noConnectionFile = "__noDBConnection";
+  open(FILE,">./$noConnectionFile");
+}
+
+###############################################################################
+# can_connect
+#
+# Returns true if there is an active db handle, false otherwise
+###############################################################################
+
+sub can_connect {
+  my $connected=0;
+  open(FILE,"$noConnectionFile") or $connected=1;
+  return $connected;
+}
+
 
 ###############################################################################
 # DBI Connection Variables
@@ -22,10 +47,11 @@ BEGIN{
 
   # Connect to DB without a database name to create the database
   my $DB_DRIVER = "DBI:mysql:server=$DB_SERVER:database=";
-  my $dbh = DBI->connect("$DB_DRIVER", "$DB_USER", "$DB_PASS")
-    or die "$DBI::errstr : perhaps you should alter $0's connection parameters";
-  $dbh->do("create database $DB_DATABASE");
-  $dbh->disconnect();
+  my $dbh = DBI->connect("$DB_DRIVER", "$DB_USER", "$DB_PASS") || _mark_noconnect();
+  if(&can_connect){
+    $dbh->do("create database $DB_DATABASE");
+    $dbh->disconnect();
+  }
 }
 
 
@@ -57,8 +83,10 @@ sub _createDB {
 ###############################################################################
 sub _dbConnect {
 	my $self=shift;
+	if(&can_connect){
     $self->{dbh} = DBI->connect("$DB_DRIVER", "$DB_USER", "$DB_PASS")
       or die "$DBI::errstr : perhaps you should alter $0's connection parameters";
+	}
 }
 
 ###############################################################################
@@ -70,20 +98,10 @@ sub _dbConnect {
 ###############################################################################
 sub getDBHandle {
     my $self = shift;
-    $self->{dbh} = _dbConnect() unless $self->is_connected();
+    $self->{dbh} = _dbConnect() unless $self->can_connect();
     return $self->{dbh};
 }
 
-###############################################################################
-# is_onnected
-#
-# Returns true if there is an active db handle, false otherwise
-###############################################################################
-
-sub is_connected {
-  my $self=shift;
-  defined($self->{dbh}) ? 1 : 0;	
-}
 
 ###############################################################################
 # get DB Server
@@ -123,10 +141,16 @@ sub getDBUser {
 
 
 END  {
+	   if(&can_connect){
          my $dbh = DBI->connect("$DB_DRIVER", "$DB_USER", "$DB_PASS")
-	   or die "$DBI::errstr : perhaps you should alter $0's connection parameters";
+	       or die "$DBI::errstr : perhaps you should alter $0's connection parameters";
          $dbh->do("drop database $DB_DATABASE");
          $dbh->disconnect();
+	   }
+	   else{ 	   	  
+	   	     unlink $noConnectionFile;
+	   }
      }
+     
 
 1;

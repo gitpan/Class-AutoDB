@@ -10,9 +10,14 @@ use strict;
 use lib qw(. t ../lib);
 use Scalar::Util;
 use Thing;
+use DBConnector;
 use Test::More qw/no_plan/;
 
-require 'DBConnector.pm';
+my $DBC = new DBConnector;
+
+SKIP: {
+        skip "! Cannot test without a database connection - please adjust DBConnector.pm's connection parameters and \'make test\' again", 1 unless $DBC->can_connect;
+
   Class::AutoDB->new(
                             -dsn=>"DBI:$DBConnector::DB_NAME:database=$DBConnector::DB_DATABASE;host=$DBConnector::DB_SERVER",
                             -user=>$DBConnector::DB_USER,
@@ -56,4 +61,5 @@ is($bill->name,"Bill","second object exists in database");
 is($joe->friends->[0]->name,'Bill',"refenced object is reachable from first object's list");
 is($joe->friends->[1],'Mary Joe Bobby Sue Jeanne Twilleger',"scalar is reachable from first object's list");
 is($bill->friends->[0]->name,'joey',"refenced object is reachable from second object's list");
+}
 }

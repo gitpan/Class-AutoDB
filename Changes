@@ -6,5 +6,7 @@ Revision history
         - some code cleanup, documentation changes 
 0.03  Thu Feb 19 09:46:40 PST 2004
         - refactored: database connection is now made at runtime
+0.04  Mon Feb 23 11:15:53 PST 2004
+        - refactored tests so that tests that need a DB connection skip if DB connection is not negotiated
 
 

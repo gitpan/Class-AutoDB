@@ -15,6 +15,9 @@ $OBJECT_COLUMNS=qq(id int not null auto_increment, primary key (id), object long
 my $DBI = new DBConnector;
 my $dbh = $DBI->getDBHandle;
 
+SKIP: {
+        skip "! Cannot test without a database connection - please adjust DBConnector.pm's connection parameters and \'make test\' again", 1 unless $DBI->can_connect;
+
 my $autodb = Class::AutoDB->new(
                                  -dsn=>"DBI:$DBConnector::DB_NAME:database=$DBConnector::DB_DATABASE;host=$DBConnector::DB_SERVER",
                                  -user=>$DBConnector::DB_USER,
@@ -142,3 +145,4 @@ $savedRegistryTestObject1->create;
 my $got = $savedRegistryTestObject1->get; 
 is( $got->[0]->name,"Person", "get() still holds original collection");
 is( $got->[1]->name,"Duck", "get() holds new collection");
+}

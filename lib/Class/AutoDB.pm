@@ -1,5 +1,5 @@
 package Class::AutoDB;
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
 use strict;
 use DBI;

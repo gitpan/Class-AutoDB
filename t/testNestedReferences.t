@@ -46,6 +46,12 @@ use DBConnector;
 use Class::AutoClass;
 use Test::More qw/no_plan/;
 
+my $DBC = new DBConnector;
+
+SKIP: {
+        skip "! Cannot test without a database connection - please adjust DBConnector.pm's connection parameters and \'make test\' again", 1 unless $DBC->can_connect;
+
+
 my($joe, $chris, $eddy, $thelma);
 
 # populate the collection
@@ -119,4 +125,5 @@ is($thelma->friends->[0]->name, "Eddy");# eddy is a friend of Thelma
 #  is($eddy_friends->friends->[0]->name, "Chris");
 # };
 
+}
 }

@@ -1,17 +1,22 @@
 use lib qw(. t ../lib);
 use strict;
-use DBI;
 use TestAutoDB_3;
 use DBConnector;
 use Class::AutoDB;
 use Class::AutoClass::Args;
 use Class::AutoDB::Cursor;
-use DBConnector;
 use Test::More qw/no_plan/;
 
 my($cursor, $autodb);
-my $DBI = new DBConnector;
-my $dbh = $DBI->getDBHandle;
+my $DBC = new DBConnector;
+my $dbh = $DBC->getDBHandle;
+
+
+SKIP: {
+        skip "! Cannot test without a database connection - please adjust DBConnector.pm's connection parameters and \'make test\' again", 1 unless $DBC->can_connect;
+
+
+
 
 my $autodb = Class::AutoDB->new(
                             -dsn=>"DBI:$DBConnector::DB_NAME:database=$DBConnector::DB_DATABASE;host=$DBConnector::DB_SERVER",
@@ -44,7 +49,7 @@ is(ref($cursor), "Class::AutoDB::Cursor", "calling cursor() with the expected pa
 ### test Cursor object creation (through autodb creation)
 ## NOT YET IMPLEMENTED
 #$cursor = Class::AutoDB->new(
-#                            -dsn=>"DBI:$DBConnector::DB_NAME:database=$DBConnector::DB_DATABASE;host=$DBConnector::DB_SERVER",
+#                            -dsn=>"DBC:$DBConnector::DB_NAME:database=$DBConnector::DB_DATABASE;host=$DBConnector::DB_SERVER",
 #                            -user=>$DBConnector::DB_USER,
 #                            -password=>$DBConnector::DB_PASS,
 #                            -find=>{-collection=>'TestAutoDB_3'}
@@ -86,4 +91,5 @@ is($cursor->get,1, "one collection is currently registered");
 
 # _get_next
 # not yet implemented
+};
 

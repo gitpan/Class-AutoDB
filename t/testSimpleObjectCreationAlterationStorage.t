@@ -3,7 +3,7 @@
 ## Test object creation, in-memory manipulation and storage.
 ##
 use lib qw(. t ../lib);
-use Test::More tests=>10;
+use Test::More qw/no_plan/;
 use TestAutoDB_3;
 use Class::AutoDB;
 use strict;
@@ -15,6 +15,10 @@ BEGIN {
  $DBC = new DBConnector;
  $DBH = $DBC->getDBHandle;
 }
+
+SKIP: {
+        skip "! Cannot test without a database connection - please adjust DBConnector.pm's connection parameters and \'make test\' again", 1 unless $DBC->can_connect;
+
 
 # connect through new AutoDB object:
 # - check above is written to database
@@ -59,4 +63,5 @@ my $obj_to_scan = $stuff[0];
 is($obj_to_scan->this,4,"retrieved and altered scalar written correctly");
 is($obj_to_scan->other->[0],'five',"retrieved and altered list element written correctly");
 is($obj_to_scan->other->[1],'six',"retrieved and altered list element written correctly");
+}
 }

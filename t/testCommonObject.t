@@ -9,10 +9,14 @@ use lib qw(. t ../lib);
 use strict;
 use Scalar::Util;
 use Thing;
+use DBConnector;
 use Test::More qw/no_plan/;
 
+my $DBC = new DBConnector;
 
-require 'DBConnector.pm';
+SKIP: {
+        skip "! Cannot test without a database connection - please adjust DBConnector.pm's connection parameters and \'make test\' again", 1 unless $DBC->can_connect;
+
   Class::AutoDB->new(
                             -dsn=>"DBI:$DBConnector::DB_NAME:database=$DBConnector::DB_DATABASE;host=$DBConnector::DB_SERVER",
                             -user=>$DBConnector::DB_USER,
@@ -72,3 +76,4 @@ my $bill_list_uid = $bill->friends->[0]->{UID};
 ok($joe_list_uid eq $bill_list_uid, "UID is the same for both snapshots of the same object");
 }
 
+}
