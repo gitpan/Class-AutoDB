@@ -3,14 +3,13 @@
 use lib qw(. t ../lib);
 use Test::More qw/no_plan/;
 use Class::AutoDB;
-#use Data::Dumper; # only for testing
 use DBConnector;
 use strict;
 use TestAutoDB_1;
 use TestAutoDB_2;
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS %AUTODB);
 
-my  $DBC = new DBConnector;
+my  $DBC = new DBConnector(noclean=>1);
 my  $DBH = $DBC->getDBHandle;
 
 SKIP: {
@@ -22,12 +21,13 @@ my $autodb = Class::AutoDB->new(
 	                          -password=>$DBConnector::DB_PASS
 	                        );
 
-my $result = $DBH->selectall_hashref("show tables", 1);
-ok(not exists $result->{_AutoDB});
-ok(not exists $result->{TestAutoDB_1});
-ok(not exists $result->{TestAutoDB_1_other});
-ok(not exists $result->{TestAutoDB_2});
-ok(not exists $result->{TestAutoDB_2_other});
+my %result = map {lc($_), 1} keys %{$DBH->selectall_hashref("show tables", 1)};
+
+ok(exists $result{_autodb});
+ok(exists $result{testautodb_1});
+ok(exists $result{testautodb_1_other});
+ok(exists $result{testautodb_2});
+ok(exists $result{testautodb_2_other});
 }
 
 

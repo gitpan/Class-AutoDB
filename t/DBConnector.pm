@@ -6,17 +6,22 @@ use strict;
 use vars qw($noConnectionFile $DB_SERVER $DB_DATABASE $DB_USER $DB_PASS $DB_DRIVER $DB_NAME @ISA);
 use DBI;
 use Class::AutoClass;
+use vars qw(@AUTO_ATTRIBUTES);
 @ISA = qw(Class::AutoClass);
 
+@AUTO_ATTRIBUTES=qw(noclean);
+
+Class::AutoClass::declare(__PACKAGE__);
+
 ###############################################################################
-# _mark_noconnect
+# _lock
 #
-# writes a file named ".noDBConnnection" in this directory so that both
+# writes a file named "__locked" in this directory so that both
 # testing class and instance methods can find out if we have a DB connection
 ###############################################################################
-sub _mark_noconnect {
-  $noConnectionFile = "__noDBConnection";
-  open(FILE,">./$noConnectionFile");
+sub _lock {
+  return if -e $noConnectionFile;
+  open( MARK, ">$noConnectionFile" ) || die "$!: failed to open lock file ($noConnectionFile)";
 }
 
 ###############################################################################
@@ -24,13 +29,15 @@ sub _mark_noconnect {
 #
 # Returns true if there is an active db handle, false otherwise
 ###############################################################################
-
 sub can_connect {
-  my $connected=0;
-  open(FILE,"$noConnectionFile") or $connected=1;
-  return $connected;
+  my ($self)=@_;
+  
+  if (-e $noConnectionFile) {
+    return 0;
+  } else {
+    return 1;
+  }  
 }
-
 
 ###############################################################################
 # DBI Connection Variables
@@ -40,25 +47,31 @@ $DB_DRIVER	= "DBI:mysql:server=$DB_SERVER;database=$DB_DATABASE";
 BEGIN{
   $DB_NAME      = 'mysql';
   $DB_SERVER    = 'localhost';
-  $DB_DATABASE  = 'AutoMagic__testSuite';
+  $DB_DATABASE  = 'automagic__testsuite';
   $DB_USER      = 'root';
   $DB_PASS      = '';
 
+  $noConnectionFile = '__locked';
+  my $dbh = 0;
   # Connect to DB without a database name to create the database
   my $DB_DRIVER = "DBI:mysql:server=$DB_SERVER:database=";
-  my $dbh = DBI->connect("$DB_DRIVER", "$DB_USER", "$DB_PASS") || _mark_noconnect();
-  if(&can_connect){
+  $dbh = DBI->connect("$DB_DRIVER", "$DB_USER", "$DB_PASS", {PrintError=>0});
+  if ($dbh) {
     $dbh->do("create database $DB_DATABASE");
     $dbh->disconnect();
+  } else { 
+    &_lock; 
   }
 }
 
 
 ###############################################################################
 # Constructor
+# valid arguments: 
+#   noclean - skip cleanup
 ###############################################################################
 sub _init_self {
-  my $self = shift;
+  my ($self,$class,$args) = @_;
   return $self->_dbConnect;
 }
 
@@ -82,8 +95,8 @@ sub _createDB {
 ###############################################################################
 sub _dbConnect {
 	my $self=shift;
-	if(&can_connect){
-    $self->{dbh} = DBI->connect("$DB_DRIVER", "$DB_USER", "$DB_PASS")
+	if($self->can_connect){
+    $self->{dbh} = DBI->connect("$DB_DRIVER", "$DB_USER", "$DB_PASS", {PrintError=>0})
       or die "$DBI::errstr : perhaps you should alter $0's connection parameters";
 	}
 }
@@ -97,10 +110,9 @@ sub _dbConnect {
 ###############################################################################
 sub getDBHandle {
     my $self = shift;
-    $self->{dbh} = _dbConnect() unless $self->can_connect();
+    $self->{dbh} = $self->_dbConnect unless $self->can_connect;
     return $self->{dbh};
 }
-
 
 ###############################################################################
 # get DB Server
@@ -138,15 +150,17 @@ sub getDBUser {
     $DB_USER;
 }
 
-END  {
-	   if(&can_connect){
+DESTROY  {
+     my $self=shift;
+     if(-e $noConnectionFile) {	  
+	     close MARK;
+	     #print "unlocking file\n";
+	   	 #unlink $noConnectionFile;
+	   } elsif($self->can_connect and not $self->noclean){
          my $dbh = DBI->connect("$DB_DRIVER", "$DB_USER", "$DB_PASS")
-	       or die "$DBI::errstr : perhaps you should alter $0's connection parameters";
+	         or die "$DBI::errstr : perhaps you should alter $0's connection parameters";
          $dbh->do("drop database $DB_DATABASE");
          $dbh->disconnect();
-	   }
-	   else{ 	   	  
-	   	     unlink $noConnectionFile;
 	   }
 }
      

@@ -4,7 +4,6 @@ use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
 use strict;
 use Class::AutoClass;
 use Class::AutoDB::Table;
-use Data::Dumper;
 @ISA = qw(Class::AutoClass); # AutoClass must be first!!
 
 @AUTO_ATTRIBUTES=qw(name _keys _tables _cmp_data);
@@ -42,8 +41,8 @@ sub merge {
   return unless UNIVERSAL::isa($diff, "Class::AutoDB::CollectionDiff");
   my $keys=$self->keys || {};
   my $new_keys=$diff->new_keys;
-  warn("merging empty collections") unless (keys %{$diff->baseline} || keys %{$diff->other});
-  @$keys{keys %$new_keys}=values %$new_keys;
+  warn("merging empty collections") unless (CORE::keys %{$diff->baseline} || CORE::keys %{$diff->other});
+  @$keys{CORE::keys %$new_keys}=values %$new_keys;
   $self->keys($keys);
   $self->_tables(undef);	# clear computed value so it'll be recomputed next time 
 }
@@ -51,7 +50,7 @@ sub alter {
   my($self,$diff)=@_;
   my @sql;
   my $new_keys=$diff->new_keys;
-  my $name=$self->name || ( warn('requires a named collection') and return);
+  my $name=$self->name || $self->throw('requires a named collection');
   # Split new keys to be added into scalar vs. list
   my($scalar_keys,$list_keys);
   while(my($key,$type)=each %$new_keys) {

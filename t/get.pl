@@ -1,39 +1,49 @@
-package Person;
 use strict;
-use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS %DEFAULTS %AUTODB);
 use lib qw(. t ../lib);
-use Class::AutoClass;
+use Person;
+use DBConnector;
 
-@ISA=qw(Class::AutoClass);
-
-@AUTO_ATTRIBUTES=qw(name sex friends);
-@OTHER_ATTRIBUTES=qw();
-%SYNONYMS=();
-%AUTODB=(
-	 -collection=>'Person',
-	 -keys=>qq(name string, sex string, friends list(string)));
-Class::AutoClass::declare(__PACKAGE__);
-
-package main;
-use strict;
-use Class::AutoDB;
-use Data::Dumper;
-
-my $autodb=new Class::AutoDB(-dsn=>'DBI:mysql:database=AutoMagic__testSuite;host=localhost',-user=>'root');
+my $autodb = Class::AutoDB->new(
+                          -dsn=>"DBI:$DBConnector::DB_NAME:database=$DBConnector::DB_DATABASE;host=$DBConnector::DB_SERVER",
+                          -user=>$DBConnector::DB_USER,
+                          -password=>$DBConnector::DB_PASS
+                        );
 
 # Query the database
-my $cursor=$autodb->find(-collection=>'Person',-name=>'Joe');
+my $j_cursor=$autodb->find(-collection=>'Person',-name=>'Joe');
 
-#print "Number of Joe's in database: ",$cursor->count,"\n";
-#while (my $joe=$cursor->get_next) {          # Loop getting the objects one by one
-
-my @joes=$cursor->get;
+my @joes=$j_cursor->get;
 for my $joe (@joes) {
   # $joe is a Person object -- do what you want with it
-  my $friends=$joe->friends;
+  my $friends=$joe->friends; 
   for my $friend (@$friends) {
     my $friend_name=$friend->name;
     print "Joe's friend is named $friend_name\n";
   }
 }
 
+my $m_cursor=$autodb->find(-collection=>'Person',-name=>'Mary');
+
+my @marys=$m_cursor->get;
+for my $mary (@marys) {
+  # $mary is a Person object -- do what you want with it
+  my $friends=$mary->friends; 
+  for my $friend (@$friends) {
+    my $friend_name=$friend->name;
+    print "Mary's friend is named $friend_name\n";
+  }
+}
+
+my $b_cursor=$autodb->find(-collection=>'Person',-name=>'Bill');
+
+my @bills=$b_cursor->get;
+for my $bill (@bills) {
+  # $bill is a Person object -- do what you want with it
+  my $friends=$bill->friends; 
+  my $friend_name;
+  for my $friend (@$friends) {
+    eval { $friend_name=$friend->name };
+    next if $@; # bill has a scalar in his friend list
+    print "Bill's friend is named $friend_name\n" if $friend_name;
+  }
+}

@@ -3,7 +3,6 @@
 use lib qw(. t ../lib);
 use Test::More qw/no_plan/;
 use Class::AutoDB;
-#use Data::Dumper; # only for testing
 use DBConnector;
 use strict;
 use TestAutoDB_1;
@@ -17,13 +16,13 @@ SKIP: {
         skip "! Cannot test without a database connection - please adjust DBConnector.pm's connection parameters and \'make test\' again", 1 unless $DBC->can_connect;
 
 my $autodb=new Class::AutoDB
-      (-database=>$DBConnector::DB_DATABASE,-host=>$DBConnector::DB_SERVER,-user=>$DBConnector::DB_USER,password=>$DBConnector::DB_PASS);
+      (-database=>$DBConnector::DB_DATABASE,-host=>$DBConnector::DB_SERVER,-user=>$DBConnector::DB_USER,-password=>$DBConnector::DB_PASS);
 
+my %result = map {lc($_), 1} keys %{$DBH->selectall_hashref("show tables", 1)};
 
-my $result = $DBH->selectall_hashref("show tables", 1);
-ok(not exists $result->{_AutoDB});
-ok(not exists $result->{TestAutoDB_1});
-ok(not exists $result->{TestAutoDB_1_other});
-ok(not exists $result->{TestAutoDB_2});
-ok(not exists $result->{TestAutoDB_2_other});
+ok(exists $result{_autodb});
+ok(exists $result{testautodb_1});
+ok(exists $result{testautodb_1_other});
+ok(exists $result{testautodb_2});
+ok(exists $result{testautodb_2_other});
 }

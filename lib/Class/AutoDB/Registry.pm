@@ -1,4 +1,5 @@
 package Class::AutoDB::Registry;
+
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
 use strict;
 use Data::Dumper;
@@ -6,7 +7,8 @@ use Class::AutoClass;
 use Class::AutoClass::Args;
 use Class::AutoDB::Registration;
 use Class::AutoDB::Collection;
-use Class::AutoDB::WeakCache;
+use Class::AutoDB::StoreCache;
+use Class::AutoDB::TypeMap;
 @ISA = qw(Class::AutoClass);
 
 @AUTO_ATTRIBUTES=qw(autodb oid object_table name2coll _exists);
@@ -19,7 +21,9 @@ $REGISTRY_OID='Registry';		# object id for registry
 $OBJECT_TABLE='_AutoDB';	# default for Object table
 $OBJECT_COLUMNS=qq(id varchar(15) not null, primary key (id), object longblob);
 # global static reference to weak cache
-my $wc = Class::AutoDB::WeakCache->instance();
+my $sc = Class::AutoDB::StoreCache->instance();
+# global static reference to TypeMap
+my $tm = new Class::AutoDB::TypeMap;
 
 sub _init_self {
   my($self,$class,$args)=@_;
@@ -78,7 +82,7 @@ sub exists {
 sub create {
   my $self=shift;
   my @collections=_flatten(@_);
-  $self->autodb($wc->recall('Class::AutoDB'));
+  $self->autodb($sc->recall('Class::AutoDB'));
   $self->throw("Cannot create registry or collections without a connected database") unless $self->autodb->is_connected;
   my $dbh=$self->autodb->dbh;
   $self->drop if $self->_exists;
@@ -180,6 +184,7 @@ sub put {
     $copy->{$key}=$value;
   }
   map {$_->tidy;} @{$self->collections}; # remove transient data from collections
+  $tm->load($self->collections); # cache in-memory collections
   my $dumper=new Data::Dumper([undef],['thaw'])->Purity(1)->Indent(0);
   my $freeze=$dumper->Values([$copy])->Dump;
   my $dbh=$autodb->dbh;

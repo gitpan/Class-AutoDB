@@ -1,0 +1,19 @@
+# http://module-build.sourceforge.net/META-spec.html
+#XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
+name:         Class-AutoDB
+version:      0.06
+version_from: lib/Class/AutoDB.pm
+installdirs:  site
+requires:
+    Class::AutoClass:              0.07
+    Class::WeakSingleton:          1.03
+    Data::Dumper:                  2.121
+    DBD::mysql:                    2.9002
+    Error:                         0.15
+    IO::Scalar:                    2.104
+    Storable:                      2.06
+    Test::More:                    0.45
+    Text::Abbrev:                  
+
+distribution_type: module
+generated_by: ExtUtils::MakeMaker version 6.17

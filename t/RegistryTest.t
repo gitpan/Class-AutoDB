@@ -6,7 +6,6 @@ use Class::AutoDB::Registration;
 use Class::AutoClass::Root;
 use DBConnector;
 use DBI;
-use Data::Dumper; # just for testing
 use strict;
 
 use vars qw($REGISTRY $REGISTRY_OID $OBJECT_TABLE $OBJECT_COLUMNS);
@@ -54,10 +53,10 @@ $transientRegistryTestObject1->register
     (-class=>'TestClass',-collection=>'Disney',
      -keys=>qq(string_key string,another_key string));
 
-my %collection_keys = %{%{$transientRegistryTestObject1->collections->[0]}->{_keys}}; # it just works, ok?
-is($collection_keys{another_key}, "string", "making sure new key added");
-is($collection_keys{string_key}, "string", "same key added twice");
-is($collection_keys{friends}, "list(string)", "making sure original keys remain");
+my $collection_keys = $transientRegistryTestObject1->collections->[0]->{_keys};
+is($collection_keys->{another_key}, "string", "making sure new key added");
+is($collection_keys->{string_key}, "string", "same key added twice");
+is($collection_keys->{friends}, "list(string)", "making sure original keys remain");
 eval{  
   $transientRegistryTestObject1->register(
                                            -class=>'TestClass',-collection=>'Disney',
@@ -93,7 +92,6 @@ my (%regs, $ary_ref);
   ok(!(exists$regs{"_AutoDB_Object1"}), "auto registry not written until exit");
 } #end of scope, _AutoDB_Object1 will be written
 
-
 # test exists
 $savedRegistryTestObject1->register(
                                       -class=>'Class::Person',
@@ -128,7 +126,7 @@ $savedRegistryTestObject1->register(
                                       -keys=>qq(name string, sex string, enemy list(string)));
 
                       
-ok(! exists $regs{"_AutoDB_Object1"}); # _AutoDB_Object1 still does not exist without explicit write              
+ok(! exists $regs{"_autodb_object1"}); # _AutoDB_Object1 still does not exist without explicit write              
 $savedRegistryTestObject1->create;
 $ary_ref = $dbh->selectall_arrayref("show tables");
 foreach(@$ary_ref){
@@ -147,3 +145,5 @@ my $got = $savedRegistryTestObject1->get;
 is( $got->[0]->name,"Person", "get() still holds original collection");
 is( $got->[1]->name,"Duck", "get() holds new collection");
 }
+
+1;

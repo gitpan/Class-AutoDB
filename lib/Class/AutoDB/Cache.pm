@@ -1,37 +1,36 @@
-package Class::AutoDB::WeakCache;
+package Class::AutoDB::Cache;
 use strict;
-use base qw(Class::WeakSingleton);
-use Storable qw(dclone);
+use base qw(Class::AutoClass Class::WeakSingleton);
 
-# a weak cache for holding objects and their ref'd names. This is a static
-# class, so only one instance is maintained.
+# A static class (only one instance is maintained, it is "weak") for caching things.
 
 sub cache {
-  my($self,$target,$proxy)=@_;
-  $self->throw('Class::AutoDB::WeakCache requires a lookup key (target) and an object instance to store') unless ($target && $proxy);
-  $target = ref($target) || $target;
-  return unless defined $proxy;
-  # want a live reference of AutoDB, all others are deep copied for freezing
-  if(ref($proxy) eq 'Class::AutoDB'){ $self->{storage}{$target} = $proxy }
-  else { my $cloned = dclone($proxy); $self->{storage}{$target} = $cloned }
+  my($self,$key,$store)=@_;
+  $key = ref($key) || $key;
+  return unless defined $store;
+  $self->{storage}{$key} = $store
 }
 sub recall {
- my($self,$target)=@_;
- $target = ref($target) || $target;
- return $self->{storage}{$target};
+ my($self,$key)=@_;
+ $key = ref($key) || $key;
+ return $self->{storage}{$key};
 }
 sub exists {
- my($self,$target)=@_;
- $self->{storage}{$target} ? 1 : 0; 
+ my($self,$key)=@_;
+ exists $self->{storage}{$key} ? 1 : 0;
 }
 sub remove {
- my($self,$target)=@_;
- delete $self->{storage}{$target};
+ my($self,$key)=@_;
+ delete $self->{storage}{$key};
+}
+sub count {
+ my $self=shift;
+ return scalar keys %{$self->{storage}} || 0;
 }
 sub dump {
  my $self=shift;
- return unless defined $self->{storage};
- $self->{storage};	
+ return undef unless defined $self->{storage};
+ return $self->{storage};	
 }
 sub clean {
  my $self=shift;
@@ -44,12 +43,12 @@ __END__
 
 =head1 NAME
 
-Class::AutoDB::WeakCache;
+Class::AutoDB::Cache;
 
 =head1 SYNOPSIS
 
 # global static reference to weak cache
-my $wc = Class::AutoDB::WeakCache->instance();
+my $wc = Class::AutoDB::Cache->instance();
 $wc->cache($unique_id,$self);
 
 # ...later (probably from another class instance):
@@ -58,8 +57,10 @@ $wc->recall($unique_id);
 
 =head1 DESCRIPTION
 
-A static dictionary for associating an object with a lookup key. Class::WeakCache holds a copy of
+A static dictionary for associating an object with a lookup key. Class::AutoDB::Cache holds a copy of
 an object until Class::AutoDB is ready to persist it into a permanant data store.
+
+As it is likely that Class::AutoDB::Cache will be extended to the developer's particular needs, it is designed for subclassing.
 
 =head1 KNOWN BUGS AND CAVEATS
 
@@ -87,24 +88,16 @@ The rest of the documentation describes the methods.
 =head2 Constructor
 
  Title   : instance
- Usage   : $wc = Class::AutoDB::WeakCache->instance();
+ Usage   : $wc = Class::AutoDB::Cache->instance();
  Function: creates global static reference to weak cache
- Returns : Class::AutoDB::WeakCache instance
+ Returns : Class::AutoDB::Cache instance
  Args    : none
  Notes   : subclasses Class::WeakSingleton
- 
-# Title   : instance
-# Usage   : $wc = Class::AutoDB::WeakCache->instance();
-# Function: creates global static reference to weak cache
-# Returns : Class::AutoDB::WeakCache instance
-# Args    : none
-# Notes   : subclasses Class::WeakSingleton
 
 #
 # Title   : cache
 # Usage   : $wc->cache($unique_id,$self);
-# Function: takes a reference to an object and a lookup key and deep copies the object
-#         : (AutoDB references are not copied) for freezing.
+# Function: takes a reference to an object and a lookup key.
 # Returns : the cached object
 # Args    : string identifier, object
 # Notes   : 
@@ -118,8 +111,7 @@ The rest of the documentation describes the methods.
 
 # Title   : recall
 # Usage   : $wc->recall($unique_id);
-# Function: retrieve the cached object (in the case of Class::AutoDB object)
-#         : or a copy (snapshot when cache() is called) of the object
+# Function: retrieve the cached object.
 # Returns : see above
 # Args    : string identifier
 # Notes   : 

@@ -3,7 +3,7 @@ package Class::AutoDB::Cursor;
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
 use strict;
 use Class::AutoClass;
-use Data::Dumper; ## only of debugging
+use Class::AutoDB::Registry;
 @ISA = qw(Class::AutoClass); # AutoClass must be first!!
 
   @AUTO_ATTRIBUTES=qw(args);
@@ -15,18 +15,19 @@ sub _init_self {
   my($self,$class,$args)=@_;
   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
   $self->args($args);
-  $self->_create_flyweight($args);
+  $self->_reconstitute($args);
   return $self;
 }
 
-# reconstitute the blessed hash with its stored data -
+# reconstitute the object with its stored data -
 # $data param contains a collection object and, optionally, search keys
-sub _create_flyweight {
+sub _reconstitute {
   my($self,$data) = @_;
   my @objects;
-  unless($data->{collection}) {
-    $self->throw("Class::AutoDB::Cursor requires a Class::AutoDB::Collection object and your search keys");
-  }
+
+  $self->throw("Class::AutoDB::Cursor requires a Class::AutoDB::Collection object and your search keys")
+    unless $data->{collection};
+
   my (@searchkeys,%searchable,$sql);
   my $collection_name = $data->collection->name;
   my $listname;
@@ -47,7 +48,7 @@ sub _create_flyweight {
 	    }
 	    $searchable{$_} = $data->search->{$_};
   }
-  $sql = "SELECT * FROM $collection_name";
+  $sql = "SELECT object FROM $collection_name";
   my $arg_cnt = (scalar keys %searchable);
   
   # AND together the query attributes
@@ -59,32 +60,27 @@ sub _create_flyweight {
       $sql .= " AND " if $arg_cnt;
     }
   }
+  
+  # grab oid from search params
   my $ary_ref;
   eval{ $ary_ref = $data->{dbh}->selectall_arrayref($sql) };
-  $self->warn("Query: <$sql> produced no results") unless $ary_ref;
-  ###
-  ### reconstitution - record the object's id and origination class so we can update it
-  ### 
-	foreach(@$ary_ref){
-    my $obj = Class::AutoDB::SmartProxy->new(collection_name=>$collection_name, __object_id=>$_->[0], __listname=>$listname);
-    push @objects, $obj;
+  $self->warn("Query: <$sql> produced no results") and return unless $ary_ref;
+  
+  ### reconstitution - create an instance of the stored object
+  foreach (@$ary_ref) {
+    my $oid = $_->[0];
+    my ($fetched,$thaw);
+    $sql = qq/select object from $Class::AutoDB::Registry::OBJECT_TABLE where id=$oid/;
+    eval{ $fetched = $data->{dbh}->selectall_arrayref($sql) };
+    $self->warn("Query: <$sql> produced no results") unless $fetched;
+    eval $fetched->[0]->[0]; # sets thaw
+    push @objects, bless $thaw, $thaw->{__proxy_for};
   }
+  
   $self->{__count} = scalar @$ary_ref;
   $self->{objects} =  \@objects;
 }
 
-# prepare SQL statement for fetching. If list argument is passed, statement
-# for fetching the list is generated
-sub _fetch_statement {
-  my($collection_name,$id,$list) = @_;
-  my $table_name;
-  if($list) {
-   $table_name = $collection_name . "_" . $list;
-  }else {
-  	$table_name = $collection_name;
-  }
-  return "SELECT * FROM $table_name WHERE object = $id";	
-}
 # return the number of objects in the retrieved collection
 sub count {
   my $self=shift;
@@ -116,7 +112,7 @@ sub get_next {
 sub reset {
   my $self=shift;
   my $cur_count=$self->{__count}; # remember iterator position
-  $self->_create_flyweight($self->args);
+  $self->_reconstitute($self->args);
 }
 
 # applies the passed subroutine reference to stored objects

@@ -3,13 +3,16 @@ use ExtUtils::MakeMaker;
 # the contents of the Makefile that is written.
 
 WriteMakefile(
-    'NAME'		=> 'Class::AutoDB',
-    'VERSION_FROM'	=> 'lib/Class/AutoDB.pm', # finds $VERSION
-    'PREREQ_PM'		=> { Class::AutoClass => '0.06', 
-                             Class::WeakSingleton => '1.03',
-			     IO::Scalar => '2.104',
-			     DBD::mysql => '2.9002',
-			     Storable => '2.06',
-			     Test::More => '0.45',
-                           }, 
+    'NAME'    => 'Class::AutoDB',
+    'VERSION_FROM'  => 'lib/Class/AutoDB.pm', # finds $VERSION
+    'PREREQ_PM'    => { Class::AutoClass => '0.07', 
+                       Class::WeakSingleton => '1.03',
+                       IO::Scalar => '2.104',
+                       DBD::mysql => '2.9002',
+                       Storable => '2.06',
+                       Test::More => '0.45',
+                       Error => '0.15',
+                       Data::Dumper => '2.121',
+                       Text::Abbrev => '',
+                      }, 
 );

@@ -46,12 +46,15 @@ sub _init_self {
   $self->inconsistent_keys($inconsistent_keys || {});
 }
 sub is_consistent {
+  no warnings;
   %{$_[0]->inconsistent_keys}==0 ? 1 : 0;
 }
 sub is_inconsistent {
+  no warnings;
   %{$_[0]->inconsistent_keys}>0 ? 1 : 0;
 }
 sub is_equivalent {
+  no warnings; # skirting non-numeric comparison warnings
   my($self)=@_;
   my $baseline_keys=$self->baseline->keys || {};
   my $other_keys=$self->other->keys || {};
@@ -61,12 +64,15 @@ sub is_different {
   !$_[0]->is_equivalent;
 }
 sub is_sub {
+ no warnings;
  $_[0]->is_consistent && %{$_[0]->new_keys}==0 ? 1 : 0;
 }
 sub is_super {
+  no warnings;
   $_[0]->is_consistent && %{$_[0]->baseline_only}==0 ? 1 : 0;
 }
 sub is_expanded {
+ no warnings;
  %{$_[0]->new_keys}>0 ? 1 : 0;
 }
 

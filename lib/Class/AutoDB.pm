@@ -1,6 +1,6 @@
 package Class::AutoDB;
-our $VERSION = '0.05';
-use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS @EXPORT);
+our $VERSION = '0.06';
+use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
 use strict;
 use DBI;
 use Class::AutoClass;
@@ -10,25 +10,28 @@ use Class::AutoDB::Registry;
 use Class::AutoDB::RegistryDiff;
 use Class::AutoDB::Cursor;
 use Class::AutoDB::SmartProxy;
-use Data::Dumper;
-@ISA=qw(Class::AutoClass Exporter);
-require Exporter;
-@EXPORT = qw/ref/;
+use Class::AutoDB::StoreCache;
+use Class::AutoDB::DeleteCache;
+use Data::Dumper; ## only for testing
+@ISA=qw(Class::AutoClass);
 
-# global static reference to weak cache
-my $wc = Class::AutoDB::WeakCache->instance();
+# global static references to caches
+my $sc = Class::AutoDB::StoreCache->instance();
+my $dc = Class::AutoDB::DeleteCache->instance();
 
 @AUTO_ATTRIBUTES=qw(dsn dbh dbd database host user password 
 		      read_only read_only_schema
 		      object_table registry
 		      session cursors diff
-		      _needs_disconnect _db_cursor);
+		      _needs_disconnect _db_cursor );
 @OTHER_ATTRIBUTES=qw(server=>'host');
-%SYNONYMS=();
+%SYNONYMS=( delete => 'del' );
 Class::AutoClass::declare(__PACKAGE__);
 
 use vars qw($AUTO_REGISTRY $AUTODB);
 $AUTO_REGISTRY=new Class::AutoDB::Registry; # default in-memory registry
+
+my %stuff;
 
 sub auto_register {
   $AUTO_REGISTRY->register(@_);
@@ -39,28 +42,29 @@ sub _init_self {
   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
   $self->session(0);
   $self->registry || $self->registry($AUTO_REGISTRY);
-  $wc->cache($class,$self);
+  $sc->cache($class,$self);
   $self->connect(%$args);
-
   my $find=$args->find;
   unless ($find) {
     return $self->_manage_registry($args);
   } else {
-  	# create registry if it doesn't already exist (this will happen when find is passed as a constructor param to AutoDB)
-  	$self->_manage_registry($args) unless $self->_registry_is_saved;
+    # create registry if it doesn't already exist (this will happen when find is passed as a constructor param to AutoDB)
+    $self->_manage_registry($args) unless $self->_registry_is_saved;
     my $cursor=$self->_manage_query($args);
     # AutoClass expects to send back an AutoClass object, so we displace it here
     undef %$self;
-	%$self=%$cursor;
+	  %$self=%$cursor;
     return bless $self, ref($cursor);
   }
 }
+
 sub _manage_query {
   my($self,$args)=@_;
     $self->find($args->find);
 }
 
 sub _manage_registry {
+  no warnings;
   my($self,$args)=@_;
   # this should return a session-oriented object
   $self->session(1) if $self->is_connected;
@@ -211,112 +215,38 @@ sub find {
   }
 }
 
-sub store{
-  my ($self,$id)=@_;
-  return unless $wc->exists($id);
-  my $persistable=$wc->recall($id);
-  # state=new for insertable objects, state=update for updatable objects - otherwise skip
-  $persistable->{__state} ? my $state = $persistable->{__state} : return;
-  my $persistable_name = $persistable->{__proxy_for} || $self->throw("Not sure who object is proxying");
-  my $registry = $self->registry;
-  my $dbh=$self->dbh || $self->connect;
-  my $object_id = $persistable->{__object_id} || $self->throw("No object ID was associated with this object");
-  my (@collKeys, @collValues, %list);
-	# serialize whole object
-	my $dumper=new Data::Dumper([$persistable],['thaw'])->Purity(1)->Indent(0)->Reset;
-	my $freeze=$dumper->Dump;
-
-  # filter out all but the searchable keys
-  foreach my $collection ($registry->collections) {
-    next unless $collection->name eq $persistable_name;
-    my @insertable=();
-	  	while(my($k,$v) = each %{$collection->_keys}) {
-		    # handle lists
-		    if($v =~ /list\(\w+\)/) {
-		      next unless $persistable->{$k};
-		      $self->throw('list must be an array ref') unless ref($persistable->{$k}) eq 'ARRAY';
-			   foreach my $item (@{$persistable->{$k}}) {
-		        # if items are scalar, just inserted them. If they are SmartProxy objects, insert IDs
-		        push @insertable, ref($item) eq 'Class::AutoDB::SmartProxy' ? $item->{__object_id} : $item;
-		      }
-		      my $list_name = "$persistable_name"."_$k";
-		       my $dumper=new Data::Dumper([\@insertable],['thaw'])->Purity(1)->Indent(0)->Reset;
-			   my $freeze=$dumper->Dump;
-		      $list{$list_name}=$freeze;
-		      # delete from top-level search keys
-		      delete $persistable->{$k};
-		    }
-	    push @collKeys, $k if exists $persistable->{$k};
-	    push @collValues, $v if exists $persistable->{$k};
-	  }
-  }
-    my ($aggCollKeys,@aggInsertableValues,$aggInsertableValues);
-      # prepare searchable keys
-	  if (values %$persistable) {
-	  	($aggCollKeys) = join ",",'object', @collKeys;
-	  	while(my($k,$v) = each %$persistable) {
-	  	  next if $k =~ /^__/; # filter system nvp's
-	  	  push @aggInsertableValues, DBI::neat($v);
-	  	}
-	  	unshift @aggInsertableValues, $object_id;
-	  	($aggInsertableValues) = join ",", @aggInsertableValues;
-	  } else { # only the object_id is present
-	     $aggCollKeys = 'object';
-	     $aggInsertableValues=$object_id
-	  }
-  ###  insert new collection #####
-  if ($state eq 'new') {
-  # handle serialized object insertion
-  my $sth = $dbh->prepare(qq/insert into $Class::AutoDB::Registry::OBJECT_TABLE values('$object_id',?)/);
-	$sth->bind_param(1,$freeze);
-	$sth->execute;
-  # handle top-level search keys
-  my $sk_insert_statement = qq/insert into $persistable_name($aggCollKeys) values($aggInsertableValues)/;
-  $dbh->do($sk_insert_statement);
-  # handle list search keys (done with lists at compile time only if list is passed in AutoDB constructor)
-  my($list_name,$list_items) = %list;
-  my $lsk_insert_statement = $dbh->prepare(qq/insert into $list_name values('$object_id',?)/);
-  $lsk_insert_statement->bind_param(1,$list{$list_name});
-  $lsk_insert_statement->execute;
-  }  
-  ### update existing collection #####
-  else {
-  	  # handle serialized object update
-    my $sth = $dbh->prepare(qq/update $Class::AutoDB::Registry::OBJECT_TABLE set object=? where id='$object_id'/);
-  	$sth->bind_param(1,$freeze);
-  	$sth->execute;
-	# handle top-level search key updates
-	my $sk_update_statement = qq/replace into $persistable_name($aggCollKeys) values($aggInsertableValues)/;
-	$dbh->do($sk_update_statement);
-    # handle lists - object IDs get inserted on updates (object IDs assignments occur over life of the object)
-    if(scalar keys %list) {
-      my($list_name,$list_items) = %list;
-       my $sth = $dbh->prepare(qq/replace into $list_name values('$object_id',?)/);
-       $sth->bind_param(1,$list_items);
-       $sth->execute;
-    }
-  }
-}
-
 # deletes search keys and serialized object from the data store for the passed
-# SmartProxy object. Refering objects are not updated (they are accessable through a referant's instance)!
-# ...but they cannot be accessed through their search keys (see deleteTest.t)
-# This might cause headaches!
+# SmartProxy object. A list from another object which refers to the deleted object is not updated! 
+# However, attempting to access a deleted object's members (through autoclass calls) will return
+# undef (see deleteTest.t).
+# This might cause some headaches! Deletion is subject to change - your input is welcome.
 sub del {
 	my ($self,$deletable)=@_;
-	$self->throw("It looks like you are trying to delete a non-AutoDB object") 
-	  unless ref($deletable) eq 'Class::AutoDB::SmartProxy';
+	my $registry = $self->registry;
 	my $dbh=$self->dbh;
 	my $table=$deletable->{__proxy_for};
 	my $id=$deletable->{__object_id};
-	my $list=$deletable->{__listname};
-	my $listname=$table.'_'.$list;
 	# delete serialized object
 	$dbh->do("delete from $Class::AutoDB::Registry::OBJECT_TABLE where id=$id");
 	# delete top-level search keys
 	$dbh->do("delete from $table where object=$id");
-  # delete list  search keys
-	$dbh->do("delete from $listname where object=$id");
+  # delete list search keys
+  my $listname = $deletable->{__listname}; # easy way (might be set in SmartProxy)
+  unless ( $listname ) { # the hard way
+    foreach my $collection ($registry->collections) {
+      next unless $collection->name eq $table;
+    	while(my($k,$v) = each %{$collection->_keys}) {
+        if($v =~ /list\(\w+\)/) {
+    		  $listname = "$table"."_$k";
+    	  }
+    	}
+    }
+  }
+  if ( $listname ) {
+	  $dbh->do("delete from $listname where object=$id");
+	  # deleted list names are cached for Class::AutoDB::SmartProxy::is_deleted
+    $dc->cache($id,1);
+  }
 }
 
 sub is_query {
@@ -333,11 +263,6 @@ sub _flatten {
   'HASH' eq ref($_[0]) ? %{$_[0]} :
     'ARRAY' eq ref($_[0]) ?  @{$_[0]} :
     @_;
-}
-
-## override built-in ref function
-sub ref {
-  CORE::ref $_[0] eq 'Class::AutoDB::SmartProxy' ? $_[0]->{__proxy_for} : CORE::ref $_[0];
 }
 
 1;
@@ -364,15 +289,14 @@ Define a Person class with attributes 'name', 'sex', and
   use Class::AutoClass;
   @ISA=qw(Class::AutoClass);
 
-  BEGIN {
-    @AUTO_ATTRIBUTES=qw(name sex friends);
-    @OTHER_ATTRIBUTES=qw();
-    %SYNONYMS=();
-    %AUTODB=(
-      -collection=>'Person',
-      -keys=>qq(name string, sex string, friends list(string)));
-    Class::AutoClass::declare(__PACKAGE__);
-  }
+  
+  @AUTO_ATTRIBUTES=qw(name sex friends);
+  @OTHER_ATTRIBUTES=qw();
+  %SYNONYMS=();
+  %AUTODB=(
+    -collection=>'Person',
+    -keys=>qq(name string, sex string, friends list(string)));
+  Class::AutoClass::declare(__PACKAGE__);
 
 =head2 Retrieve existing objects
 
@@ -461,16 +385,18 @@ collection by specifying values of search keys.  For example
 finds all objects in the 'Person' collection whose 'name' key is
 'Joe'.  If you specify multiple search keys, the values are ANDed.
 
+[ not yet implemented:
 The 'find' method also allows almost raw SQL queries with the caveat
 that these are very closely tied to the implementation and will not be
-portable if we ever change the implementation.
+portable if we ever change the implementation. ]
 
+[ not yet implemented:
 A collection can contain objects from many different classes.  (This
 is Perl after all -- what else would you expect ??!!) To limit a
 search to objects of a specific class, you can pass a 'class'
 parameter to find.  In fact, you can search for objects of a given
 class independent of the collection by specifying a 'class' parameter
-without a 'collection'.
+without a 'collection'. ]
 
 When you create an object, the system automatically stores it in the
 database at an 'appropriate' time, presently just before Perl destroys
@@ -512,16 +438,20 @@ the name of a method that can be called with no arguments.) The value
 of an attribute must be a scalar, an object reference, or an ARRAY (or
 list) of such values.) The data type can be 'string', 'integer',
 'float', 'object', any legal MySQL column type, or the phrase
-list(<data type>), eg, 'list(integer)'.
+list(<data type>), eg, 'list(integer)'. A special type of 'list(mixed)' is
+provided that allows for either string or object types. Because future
+optimizations are planned for the specific types, 'mixed' type should not be
+used where speed is an issue.
 
 NB: At present, only our special data types ('string', 'integer',
-'float', 'object') are supported. These can be abbreviated. These are
+'float', 'object','mixed' ) are checked - though others are allowed. These are
 translated into mySQL types as follows:
 
   string  => longtext
   integer => int
   float   => double
   object  => int
+  mixed   => longtext
 
 The 'keys' parameter can also be an array of attribute names, eg,
 
@@ -534,10 +464,12 @@ numeric.  See Persistence Model below.
 The types 'object' and 'list(object)' only work on objects whose
 persistence is managed by our Persistence mechanisms.
 
+[ not yet implemented: 
 The 'collection' values may also be an array of collections (and may
 be called 'collections') in which case the object is stored in all the
-collections.
+collections. ]
 
+[ not yet implemented:
 A subclass need not define %AUTODB, but may instead rely on the
 value set by its super-classes. If the subclass does define
 %AUTODB, its values are 'added' to those of its super-classes.
@@ -545,8 +477,9 @@ Thus, if the suclass uses a different collection than its super-class,
 the object is stored in both.  It is an error for a subclass to define
 the type of a search key differently than its super-classes.  It is
 also an error for a subclass to inherit a search key from multiple
-super-classes with different types  We hope this situation is rare!
+super-classes with different types  We hope this situation is rare! ]
 
+[ not yet implemented:
 Technically, %AUTODB is a parameter list for the register
 method of Class::AutoDB.  See that method for more details. Some
 commonly used slots are
@@ -559,7 +492,7 @@ commonly used slots are
    retrieved when this object is retrieved.  These should be
    attributes that refer to other auto-persistent objects. This useful
    in cases where there are attributes that are used so often that it
-   makes sense to retrieve them as soon as possible.
+   makes sense to retrieve them as soon as possible. ]
 
 =head2 Using AutoDB in your code
 
@@ -579,19 +512,18 @@ you.  You can also manually retrieve objects at any time by running
 
 You can create new objects as usual and they will be automatically
 written to the database when you're done with them.  More precisely,
-the AutoClass DESTROY method writes the object to the database when
+the object's DESTROY method (even more precisely, AutoClass ensures that 
+every AutoDB object ISA Class::AutoDB::SmartProxy, the SmartProxy
+DESTROY method handles persistence) writes the object to the database when
 Perl determines that the in-memory representation of the object is no
 longer needed.  This is guaranteed to happen when the program
 terminates if not before.  You can also manually write objects to the
-database earlier if you so desire by running the 'put' method.  If you
-override DESTROY, make sure you call AutoClass DESTROY in your method.
+database earlier if you so desire by running the 'store' method on them.  
+If you override DESTROY, make sure you call SmartProxy DESTROY in your method.
 
-You can modify objects as usual (almost!) and the system will take
+You can modify objects as usual and the system will take
 care of writing the updates to the database, just as it does for new
-objects.  The one caution is that code that modifies the object must
-mark it as 'dirty'.  This is done automatically by methods generated
-by AutoClass.  If you write your own mutators, you must do this
-yourself by running the 'dirty' method.
+objects.
 
 =head2 Flavors of 'new', 'find', and 'get'
 
@@ -637,6 +569,7 @@ eg,
 The key=>value pairs are ANDed as one would expect.  The above query
 retrieves all Persons whoe name is Joe and sex is male.
 
+[ not yet implemented: 
 The raw form is specifed by providing a SQL query (as a string) that
 lacks the SELECT phrase, eg,
 
@@ -653,15 +586,15 @@ cannot be represented in the key=>value form.  For example
 
 'find' can also be invoked on a cursor object.  The effect is to AND
 the new query with the old.  This only works with the first form
-(since conjoining raw SQL is a bear).
+(since conjoining raw SQL is a bear). ]
 
 =head2 Creating and initializing the database
 
 Before you can use AutoDB, you have to create a MySQL database that
 will hold your data.  We do not provide a means to do this here, since
 you may want to put your AutoDB data in a database that holds other
-data as well.  The databse can be empty or not.  AutoDB creates all th
-etables it needs -- you need not (and should not create) these
+data as well.  The databse can be empty or not.  AutoDB creates all the 
+tables it needs -- you need not (and should not create) these
 yourself.
 
 Important note: Hereafter, the term 'database' refers to the tables
@@ -673,7 +606,7 @@ Methods are provided to create or drop the entire database (meaning,
 of course, the AutoDB database, not the MySQL database) or individual
 collections.
 
-AutoPeristence maintains a registry that describes the collections and
+AutoDB maintains a registry that describes the collections and
 classes stored in the database.  Registration of classes is usually
 handled by AutoClass behind the scenes.  The system consults the
 registry when creating and dropping the database and when creating
@@ -698,7 +631,7 @@ The name of this table can be chosen when the database is
 created. '_AutoDB' is the default.
 
 For each collection, there is one table we call the base table that
-holds scalar serach keys, and one table per list-valued search keys.  
+holds scalar search keys, and one table per list-valued search keys.  
 
 The name of the base table is the same as the name of the collection;
 there is no way to change this at present. For our Person example, the
@@ -714,7 +647,7 @@ create table Person (
 If a Person has a significant_other (also a Person), the table would look like this:
 
 create table Person (
-        object int,  --- foreign key pointing to _AutoP_Object, also primary key here
+        object int,  --- foreign key pointing to _AutoDB_Object, also primary key here
         name longtext,
         sex longtext,
         significant_other int -- foreign key pointing to _AutoDB -- will be a Person
@@ -738,9 +671,9 @@ create table Person_friends (
         friends int  --- foreign key pointing to Object -- will be a Person
         );
 
-[A small detail: since the whole purpose of these tables is to enable
-querying, indexes will be created for each column by default.  This is
-not yet implemented.]
+[not yet implemented: 
+A small detail: since the whole purpose of these tables is to enable
+querying, indexes will be created for each column by default. ]
 
 When an object is stored in the databse, it obtains a unique object
 identifier, called an oid. This is just the id field of the Object
@@ -1040,7 +973,7 @@ in which case the data type of each attribute is assumed to be
 'string'.  This works in many cases even if the data is really
 numeric as discussed in the Persistence Model section.
 
-The types 'object' and 'list(object)' only work or objects that whose
+The types 'object' and 'list(object)' only work on objects whose
 persistence is managed by AutoDB.
 
  Title   : create

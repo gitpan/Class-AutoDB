@@ -8,5 +8,10 @@ Revision history
         - refactored: database connection is now made at runtime
 0.04  Mon Feb 23 11:15:53 PST 2004
         - refactored tests so that tests that need a DB connection skip if DB connection is not negotiated
-
-
+0.05  17 May 2004
+	- refactor of reconstitution code
+0.06  Mon Aug 16 14:24:43 PDT 2004
+        - major refactor of persistence handling. Store() method added to store objects explicitly (implicit 
+          storage still occurs when an object is destroyed. Implicitly destroyed objects will not overwrite 
+          explicitly destroyed ones). Mosts tests have been re-written and new ones have been added to test
+          this storage handling.

@@ -3,6 +3,7 @@ package Class::AutoDB::Registration;
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
 use strict;
 use Class::AutoClass;
+
 @ISA = qw(Class::AutoClass); # AutoClass must be first!!
 
   @AUTO_ATTRIBUTES=qw(class _collection _keys _skip _auto_get);

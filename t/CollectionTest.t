@@ -5,7 +5,7 @@ use Class::AutoDB;
 use Class::AutoDB::Collection;
 use Class::AutoDB::Registration;
 use IO::Scalar;
-use DBI;
+#use DBI;
 use strict;
 
 
@@ -94,16 +94,7 @@ use strict;
   is($tables->[0]->{_keys}->{color}, "string", "table _keys look good");
   is($tables->[0]->{_keys}->{significant_other}, "object", "table _keys look good");
   is($tables->[1]->{name}, "testing_friends", "testing naming convention collectionName_listName upheld");
-  is($tables->[1]->{_keys}->{friends}, "object", "$tables->[1] contains list of type object");
-
-  # should get a warning,return if our collection has no name
-  {                                                                                                                                                             
-  	my $DEBUG_BUFFER="";                                                                                                                        
-  	tie *STDERR, 'IO::Scalar', \$DEBUG_BUFFER;
-  	eval{ $nameless_reference_object->alter($diff)->[0] };                                                                                     
-  	ok($DEBUG_BUFFER =~ /requires a named collection/, "alter() requires a named collection");                                    
-  	untie *STDERR;                                                                                                                                               
-  }
+  is($tables->[1]->{_keys}->{friends}, "object", "tables contains list of type object");
                                                                
   $named_reference_object->register($reg1);
   is($named_reference_object->alter($diff)->[0],'alter table testing add color longtext,add petals int', 'alter() returns expected alter statement');

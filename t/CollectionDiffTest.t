@@ -47,13 +47,13 @@ use strict;
   my $diff = $unlike_reference_object;
   
   ok( ($diff->baseline =~ /Class::AutoDB::Collection/) && ($diff->other =~ /Class::AutoDB::Collection/), "diff contains Collection objects");
-  is(keys %{$diff->same_keys}, 1, "same_keys contains correct number of keys");
+  is(scalar keys %{$diff->same_keys}, 1, "same_keys contains correct number of keys");
   is($diff->same_keys->{name}, "string", "same_keys contains correct value");
-  is(keys %{$diff->baseline_only}, 3, "baseline_only contains correct number of keys");
+  is(scalar keys %{$diff->baseline_only}, 3, "baseline_only contains correct number of keys");
   is($diff->baseline_only->{friends}, "list(object)", "baseline_only contains correct value");
   is($diff->baseline_only->{significant_other}, "object", "baseline_only contains correct value");
   is($diff->baseline_only->{sex}, "string", "baseline_only contains correct value");
-  is(keys %{$diff->new_keys}, 2, "new_keys contains correct number of keys");
+  is(scalar keys %{$diff->new_keys}, 2, "new_keys contains correct number of keys");
   is($diff->new_keys->{color}, "string", "new_keys contains correct value");
   is($diff->new_keys->{petals}, "int", "new_keys contains correct value");
   is($diff->{inconsistent_keys}->{uh_oh}->[0], "string", "checking types of inconsistent keys");
@@ -67,20 +67,20 @@ use strict;
   is($like_diff->is_consistent, 1, "is_consistent check passes with like collections");
 
 # test is inconsistent
-  my $unlike_diff = $unlike_reference_object;
-  my $like_diff = $like_reference_object;
+  $unlike_diff = $unlike_reference_object;
+  $like_diff = $like_reference_object;
   is($unlike_diff->is_inconsistent, 1, "is_inconsistent check passes with unlike collections");
   is($like_diff->is_inconsistent, 0, "is_inconsistent check passes with like collections");
 
 # test is equivalent
-  my $unlike_diff = $unlike_reference_object;
-  my $like_diff = $like_reference_object;
+  $unlike_diff = $unlike_reference_object;
+  $like_diff = $like_reference_object;
   is($unlike_diff->is_equivalent, 0, "is_equivalent check passes with unlike collections");
   is($like_diff->is_equivalent, 1, "is_equivalent check passes with like collections");
 
 # test is different
-  my $unlike_diff = $unlike_reference_object;
-  my $like_diff = $like_reference_object;
+  $unlike_diff = $unlike_reference_object;
+  $like_diff = $like_reference_object;
   is($unlike_diff->is_equivalent, 0, "is_different check passes with unlike collections");
   is($like_diff->is_equivalent, 1, "is_different check passes with like collections");
 
@@ -91,14 +91,13 @@ use strict;
   is($super_diff->is_sub, 0, "is_sub check fails with super collections");
 
 # test is super member
-  my $sub_diff = $sub_reference_object;
-  my $super_diff = $super_reference_object;
+  $sub_diff = $sub_reference_object;
+  $super_diff = $super_reference_object;
   is($sub_diff->is_super, 0, "is_super check fails with sub collections");
   is($super_diff->is_super, 1, "is_super check passes with super collections");
 
 # test is expanded
-  my $sub_diff = $sub_reference_object;
-  my $super_diff = $super_reference_object;
+  $sub_diff = $sub_reference_object;
+  $super_diff = $super_reference_object;
   is($sub_diff->is_expanded, 0, "is_expanded check fails with sub collections");
   is($super_diff->is_expanded, 1, "is_expanded check passes with super collections");
-

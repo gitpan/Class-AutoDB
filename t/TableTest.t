@@ -24,10 +24,10 @@ is(ref($reference_object), "Class::AutoDB::Table");
 	my @results = $reference_object->schema;
 	is($results[0], "create table tree (object varchar(10) not null, primary key (object),woodland_friends longtext,height int)", "testing default schema results");	
 
-	my @results = $reference_object->schema('create');
+	@results = $reference_object->schema('create');
 	is($results[0], "create table tree (object varchar(10) not null, primary key (object),woodland_friends longtext,height int)", "testing create schema results");	
 
-	my @results = $reference_object->schema('drop');
+	@results = $reference_object->schema('drop');
 	is($results[0], "drop table if exists tree", "testing drop schema");	
 
  	my $other = "foo";
@@ -36,7 +36,7 @@ is(ref($reference_object), "Class::AutoDB::Table");
 
 ## This is just a hack, so it tells you what you need to do to make an existing table fit in.  
 # $other does nothing and is not looked for. Probably should make this smarter.
- 	my $other = "";
-	my @results = $reference_object->schema('alter', $other);
+ 	$other = "";
+	@results = $reference_object->schema('alter', $other);
 	is($results[0], "alter table tree add woodland_friends longtext,add height int", "testing alter");
 
