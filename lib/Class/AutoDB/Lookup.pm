@@ -1,6 +1,5 @@
 package Class::AutoDB::Lookup;
 use strict;
-use Clone;
 use base qw/Class::WeakSingleton/;
 
 # this class stores keys value pairs in both directions, such that:
@@ -14,7 +13,6 @@ sub new {
   return bless \%storage, $self;
 }
 
-## TODO : test that cloning cycles works out
 sub remember {
   my $self = shift;
   my $uid = _getUID();

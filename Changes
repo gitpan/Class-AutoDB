@@ -2,4 +2,9 @@ Revision history
 
 0.01  Mon Dec 22 17:28:49 PST 2003
 	- original version. 
+0.02  Tues Jan 06 17:01:12 PST 2004
+        - some code cleanup, documentation changes 
+0.03  Thu Feb 19 09:46:40 PST 2004
+        - refactored: database connection is now made at runtime
+
 

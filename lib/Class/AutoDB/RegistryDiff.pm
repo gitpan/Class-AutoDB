@@ -9,7 +9,7 @@ use Class::AutoDB::Collection;
 use Class::AutoDB::CollectionDiff;
 @ISA = qw(Class::AutoClass);
 
-BEGIN {
+##BEGIN {
   @AUTO_ATTRIBUTES=qw(baseline other
 		      baseline_only new_collections
 		      equivalent_diffs sub_diffs super_diffs expanded_diffs inconsistent_diffs
@@ -17,7 +17,7 @@ BEGIN {
   @OTHER_ATTRIBUTES=qw();
   %SYNONYMS=();
   Class::AutoClass::declare(__PACKAGE__,\@AUTO_ATTRIBUTES,\%SYNONYMS);
-}
+##}
 
 sub _init_self {
   my($self,$class,$args)=@_;

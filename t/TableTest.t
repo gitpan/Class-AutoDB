@@ -1,5 +1,4 @@
-use lib 't/';
-use lib 'lib/';
+use lib qw(. t ../lib);
 use base qw(Test::Class);
 use Test::More qw/no_plan/;
 use Data::Dumper;

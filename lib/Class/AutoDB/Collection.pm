@@ -7,12 +7,12 @@ use Class::AutoDB::Table;
 use Data::Dumper;
 @ISA = qw(Class::AutoClass); # AutoClass must be first!!
 
-BEGIN {
+##BEGIN {
   @AUTO_ATTRIBUTES=qw(name _keys _tables _cmp_data);
   @OTHER_ATTRIBUTES=qw(register);
   %SYNONYMS=();
   Class::AutoClass::declare(__PACKAGE__);
-}
+##}
 sub _init_self {
   my($self,$class,$args)=@_;
   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this

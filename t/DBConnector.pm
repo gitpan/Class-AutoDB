@@ -122,17 +122,11 @@ sub getDBUser {
 }
 
 
-sub DESTROY{
-	my $self=shift;
-	if($self) {
-	  $self->{dbh}->do("drop database $DB_DATABASE");
-	  $self->{dbh}->disconnect();
-	} else {
-	    my $dbh = DBI->connect("$DB_DRIVER", "$DB_USER", "$DB_PASS")
-          or die "$DBI::errstr : perhaps you should alter $0's connection parameters";
-        $dbh->do("drop database $DB_DATABASE");
-        $dbh->disconnect();
-	}	
-}
+END  {
+         my $dbh = DBI->connect("$DB_DRIVER", "$DB_USER", "$DB_PASS")
+	   or die "$DBI::errstr : perhaps you should alter $0's connection parameters";
+         $dbh->do("drop database $DB_DATABASE");
+         $dbh->disconnect();
+     }
 
 1;

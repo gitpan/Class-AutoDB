@@ -1,6 +1,4 @@
-use lib 't/';
-use lib 'lib/';
-use Data::Dumper; ## only for testing
+use lib qw(. t ../lib);
 use strict;
 use Class::AutoDB::Lookup;
 use Test::More qw/no_plan/;

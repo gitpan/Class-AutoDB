@@ -6,10 +6,8 @@
 ## both work.
 ##
 
-use lib 't/';
-use lib 'lib/';
-use Data::Dumper;
 use strict;
+use lib qw(. t ../lib);
 use Scalar::Util;
 use Thing;
 use Test::More qw/no_plan/;
@@ -59,7 +57,3 @@ is($joe->friends->[0]->name,'Bill',"refenced object is reachable from first obje
 is($joe->friends->[1],'Mary Joe Bobby Sue Jeanne Twilleger',"scalar is reachable from first object's list");
 is($bill->friends->[0]->name,'joey',"refenced object is reachable from second object's list");
 }
-
-
-# cleanup
-&DBConnector::DESTROY;

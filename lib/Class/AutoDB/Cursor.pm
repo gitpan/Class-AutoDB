@@ -3,15 +3,12 @@ package Class::AutoDB::Cursor;
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
 use strict;
 use Class::AutoClass;
-use Data::Dumper;
 @ISA = qw(Class::AutoClass); # AutoClass must be first!!
 
-BEGIN {
   @AUTO_ATTRIBUTES=qw();
   @OTHER_ATTRIBUTES=qw();
   %SYNONYMS=();
   Class::AutoClass::declare(__PACKAGE__);
-}
 
 sub _init_self {
   my($self,$class,$args)=@_;
@@ -36,7 +33,7 @@ sub _slot {
     foreach(keys %{$data->search}) {
   	  next if $_ eq 'collection';
   	  unless($data->collection->_keys->{$_}) {
-  	    warn("can't find key named \'$_\' in $collection_name, ignoring it");
+  	    $self->warn("can't find key named \'$_\' in $collection_name, ignoring it");
   	    next;
   	  }
   	  $searchable{$_} = $data->search->{$_};
@@ -55,8 +52,9 @@ sub _slot {
         $sql .= " AND " if $arg_cnt;
       }
     }
-    
-    my $ary_ref = $data->{dbh}->selectall_arrayref($sql);
+    my $ary_ref;
+    eval{ $ary_ref = $data->{dbh}->selectall_arrayref($sql) };
+    $self->warn("Query: <$sql> produced no results") unless $ary_ref;
 	
     # reconstitution
     foreach(@$ary_ref){

@@ -1,10 +1,11 @@
 package Class::AutoDB;
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
 use strict;
 use DBI;
 use Class::AutoClass;
 use Class::AutoClass::Args;
+use Class::AutoClass::Root;
 use Class::AutoDB::Registry;
 use Class::AutoDB::RegistryDiff;
 use Class::AutoDB::Cursor;
@@ -14,33 +15,32 @@ use Scalar::Util ();
 
 use Class::AutoDB::Lookup;
 my $lookup = new Class::AutoDB::Lookup;
+my %remember; # remember what collections are persistant
 
-BEGIN {
-  @AUTO_ATTRIBUTES=qw(dsn dbh dbd database host user password 
+@AUTO_ATTRIBUTES=qw(dsn dbh dbd database host user password 
 		      read_only read_only_schema
 		      object_table registry
 		      session cursors diff
 		      _needs_disconnect _db_cursor);
-  @OTHER_ATTRIBUTES=qw(server=>'host');
-  %SYNONYMS=();
-  Class::AutoClass::declare(__PACKAGE__);
-}
-use vars qw($AUTO_REGISTRY);
-$AUTO_REGISTRY=new Class::AutoDB::Registry;
+@OTHER_ATTRIBUTES=qw(server=>'host');
+%SYNONYMS=();
+Class::AutoClass::declare(__PACKAGE__);
+
+use vars qw($AUTO_REGISTRY $AUTODB);
+$AUTO_REGISTRY=new Class::AutoDB::Registry; # default in-memory registry
 
 sub auto_register {
-  my($class,@args)=@_;
-  $class->connect(@args) unless $class->is_connected;
-  $AUTO_REGISTRY = $class->registry || new Class::AutoDB::Registry;
-  $AUTO_REGISTRY->register(@args);
+  $AUTO_REGISTRY->register(@_);
 }
 
 sub _init_self {
   my($self,$class,$args)=@_;
+  ## TODO: this needs to be an instance variable of AutoDB-able objs
+  $AUTODB = $self; # hold a global reference to AutoDB obj
   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
+  $self->session(0);
   $self->registry || $self->registry($AUTO_REGISTRY);
   $self->connect(%$args);
-  return unless $self->is_connected;
   my $find=$args->find;
   unless ($find) {
     return $self->_manage_registry($args);
@@ -58,7 +58,7 @@ sub _manage_query {
 sub _manage_registry {
   my($self,$args)=@_;
   # this should return a session-oriented object
-  $self->session(1);
+  $self->session(1) if $self->is_connected;
   # grab schema modification parameters
   my $read_only_schema=$self->read_only_schema || $self->read_only;
   my $drop=$args->drop;
@@ -67,10 +67,9 @@ sub _manage_registry {
   my $count=($create>0)+($alter>0)+($drop>0);
   $self->throw("It is illegal to set more than one of -create, -alter, -drop") if $count>1;
   $self->throw("Schema changes not allowed by -read_only or -read_only_schema setting") if $count && $read_only_schema;
-  
   # get saved registry and merge with in-memory registry
   my $in_memory=$self->registry;
-  my $saved=new Class::AutoDB::Registry(-autodb=>$self,-object_table=>$self->object_table,-get=>1);
+  my $saved=new Class::AutoDB::Registry(-autodb=>$self,-object_table=>$self->object_table,-get=>1);  
   my $diff=new Class::AutoDB::RegistryDiff(-baseline=>$saved,-other=>$in_memory);
   if (!$diff->is_sub) {		# in-memory schema adds something to saved schema
     $self->throw("In-memory and saved registries are inconsistent") unless $diff->is_consistent;
@@ -78,11 +77,11 @@ sub _manage_registry {
     unless ($count) {
       # if no options are set can only make default changes
       if ($saved->exists) {	
-	$self->throw("In-memory registry adds to saved registry, but schema alteration prevented by -alter=>0") if $alter eq 0;
-	# alter-if--exists case -- can only add collections
-	$self->throw("Some collections are expanded in-memory relative to saved registry.  Must set -alter=>1 to change saved registry") if $diff->has_expanded;
+        $self->throw("In-memory registry adds to saved registry, but schema alteration prevented by -alter=>0") if $alter eq 0;
+        # alter-if--exists case -- can only add collections
+        $self->throw("Some collections are expanded in-memory relative to saved registry.  Must set -alter=>1 to change saved registry") if $diff->has_expanded;
       } else {
-	$self->throw("Schema does not exist, but schema creation prevented by -create=>0") if $create eq 00;
+        $self->throw("Schema does not exist, but schema creation prevented by -create=>0") if $create eq 00;
       }
     }
     $saved->merge($diff);
@@ -96,8 +95,8 @@ sub _manage_registry {
   
   # Finally, do default schema operations if required
   if (!$diff->is_sub) { # in-memory schema adds something to saved schema
-    $self->create, return if !$saved->exists;
-    $self->alter, return if $saved->exists;
+    $self->create, return if (!$saved->exists && $self->is_connected);
+    $self->alter, return if ($saved->exists && $self->is_connected);
   }
   return $self;
 }
@@ -105,23 +104,23 @@ sub connect {
   my($self,@args)=@_;
   my $args=new Class::AutoClass::Args(@args);
   $self->Class::AutoClass::set_attributes([qw(dbh dsn dbd host server user password database)],$args);
-  $self->_connect;
+  $self->_connect();# if $self->dbh;
 }
 sub _connect {
   my($self)=@_;
   return $self->dbh if $self->dbh;		# if dbh set, then already connected
+  return unless $self->database || $self->dsn;
   my $dbd=lc($self->dbd)||'mysql';
-  $self->throw("-dbd must be 'mysql' at present") if $dbd && $dbd ne 'mysql';
-  my $dsn=$self->dsn;
-  if ($dsn) {			# parse off the dbd, database, host elements
+  $self->throw("-dbd must be 'mysql' at present") if $dbd ne 'mysql';
+  my $dsn;
+  if ($self->dsn) {			# parse off the dbd, database, host elements
+    $dsn = $self->dsn;
     $dsn = "DBI:$dsn" unless $dsn=~ /^dbi/i;
   } else {
     my $database=$self->database;
     my $host=$self->host || 'localhost';
-    #(warn("connect requires 'database' and 'host' args") and return undef) unless ($database && $host);
     $dsn="DBI:$dbd:database=$database;host=$host";
   }
-  
   # Try to establish connection with data source.
   my $user = ($self->user || $self->user('root'));
   my $dbh = DBI->connect($dsn,$user,$self->password,
@@ -130,7 +129,6 @@ sub _connect {
   $self->dbh($dbh);
   $self->_needs_disconnect(1);
   $self->throw("DBI::connect failed for dsn=$dsn, user=$user: ".DBI->errstr) unless $dbh;
-  return $dbh;
 }
 
 sub create {
@@ -159,26 +157,43 @@ sub alter {
 
 sub exists {
   my $self = shift;
-  # use AutoDB's dsn entry if it is more complete than registry's copy
-    unless( $self->registry->autodb->dsn =~ /database=(\w+)\:/ ){
-      unless($self->dsn =~ /database=(\w+)[\:\;]/){
-		warn("you have not specified a database in your connection parameters");
-      } else {
-      	  #dbh based on incomplete dsn
-          $self->registry->autodb->{dbh} = $self->dbh;
-      }
-  }
+  #print Dumper $self;
+  $self->throw("there is no established database connection") unless $self->is_connected;
+  ## use AutoDB's dsn entry if it is more complete than registry's copy
+  ##  unless( $self->registry->autodb->dsn =~ /database=(\w+)\:/ ){
+  ##    unless($self->dsn =~ /database=(\w+)[\:\;]/){
+  ##		warn("you have not specified a database in your connection parameters");
+  ##    } else {
+  ##    	  #dbh based on incomplete dsn
+  ##        $self->registry->autodb->{dbh} = $self->dbh;
+  ##    }
+  ##}
   $self->registry->exists ? 1 : 0;
 }
 
 # receives a session-oriented Registry object from _manage_query
+# throw a warning if the collections are not found in the data store.
+# they may be in memory still, but we are not yet handling that case.
+# the safe way out is to use AutoDB::commit  before calling find()
+## make sure to commit.
 sub find {
   my($self,@query)=@_;
   my %normalized = _flatten(@query);
   my $args = new Class::AutoClass::Args(%normalized);
+  my $cursor;
   $self->exists || $self->throw("registry was not found in the database");
+  
   if(defined $args->collection) {
-    # nothing to do 
+    # need to return a cursor obj
+    my $collections = $self->registry->get;
+    my $collection_to_find = $args->collection;
+    foreach my $collection (@$collections){
+      next unless lc($collection->name) eq lc($collection_to_find);
+      my $keys = $args->getall_args;
+      # TODO: still need to pass the dbh?
+      $cursor = Class::AutoDB::Cursor->new(-collection=>$collection, -search=>$keys, -dbh=>$self->dbh);
+    }
+    warn("collection \'$collection_to_find\' was not found in the database") unless $cursor;
   }
   elsif($query[0] =~ /^select/i) {
     $self->throw("free-form query not yet supported");
@@ -188,19 +203,6 @@ sub find {
   	$self->throw("query must either contain a collection argument or be a free-form SELECT statement");
   	return;
   }
-  
-  # need to return a cursor obj
-  my $collections = $self->registry->get;
-  my $collection_to_find = $args->collection;
-  my ($found, $cursor);
-  foreach my $collection(@$collections){
-   next unless $collection->name eq $collection_to_find;
-   my $keys = $args->getall_args;
-   # TODO: still need to pass the dbh?
-   $cursor = Class::AutoDB::Cursor->new(-collection=>$collection, -search=>$keys, -dbh=>$self->dbh);
-   $found = 1;
-  }
-  warn("collection: $collection_to_find was not found in the database") unless $found;
   return $cursor;
 }
 
@@ -235,6 +237,11 @@ sub store{
   my ($aggCollKeys) = join ",", @collKeys;
   my ($aggCollValues) = join ",", map { DBI::neat($_) } @collValues;
 
+  # filter out our special keys
+  while (my($k,$v) = each %$persistable) {
+  	delete $persistable->{$k} if $k =~ /^__/;
+  }
+
   # prepare insert string
   my ($aggInsertableValues) = join ",", map { DBI::neat($_) } values %$persistable;
   # prepare update string
@@ -244,7 +251,6 @@ sub store{
   my $arg_cnt = (scalar keys %$persistable);
   while(my($k,$v) = each %$persistable){
     $arg_cnt--;
-    next if $k =~ /^__/; # we don't store __special keys
     next if $k eq 'UID'; # never update object's id
     $aggUpdatableValues .= "$k\=" . DBI::neat($v);
     $aggUpdatableValues .= ',' if $arg_cnt;
@@ -328,8 +334,8 @@ sub _freeze {
     foreach my $member (@$value) {                                                                                               
       # compare references => deal with each of the build in types                                                                                                                                         
       if(ref($member) eq ('SCALAR' || 'HASH' || 'CODE' || 'GLOB')) {                                                                                                  
-        push @$list, $member;                                                                                                                       
-      }                                                                                                                                           
+        push @$list, $member;                                                                                                                    
+      }                                                                                                                      
       elsif(ref($member)) { # $member is a user-defined object                                                                          
         unless( $lookup->recall($member) || $member->{'UID'}) {                                                                                
           $member->{'UID'} = $lookup->remember($member);                                           
@@ -349,7 +355,6 @@ sub is_query {
 }
 
 sub is_connected {
-  my($self)=@_;
   $_[0]->dbh;
 }
 
@@ -361,7 +366,6 @@ sub _flatten {
     'ARRAY' eq ref $_[0] ?  @{$_[0]} :
     @_;
 }
-
 
 1;
 

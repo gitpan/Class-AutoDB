@@ -2,10 +2,9 @@
 # Blackbox test the overall funtionality of AutoDB:
 ## Test object creation, in-memory alteration, and DB storage. Ensure circular refs are eliminated.
 ##
-use lib 't/';
-use lib 'lib/';
+use lib qw(. t ../lib);
 use Test::More qw/no_plan/;
-use Data::Dumper;
+use Person;
 use Class::AutoDB;
 use strict;
 use Scalar::Util ();
@@ -26,7 +25,6 @@ my $autodb = Class::AutoDB->new(
                          );
 
 {
-require 'Person.pm';
 my $joe = new Person(-name=>'Joe',-sex=>'male');
 my $trudy = new Person(-name=>'Trudy',-sex=>'female');
 my $mary = new Person(-name=>'Mary',-sex=>'female');
@@ -44,6 +42,7 @@ is($bill->sex, "male", "checking forth object's data");
 # make edits prior to going out of scope (object hasn't been written to DB yet)
 $joe->name('Joey');
 is($joe->name, "Joey", "checking first object's data altered data in memory");
+#sleep(30);
 my $result = $DBH->selectall_arrayref('select count(*) from Person where name="Joey"');
 is($result->[0]->[0],0, "checking first object's data altered data not (yet) altered in database");
 Scalar::Util::weaken($joe);
@@ -65,7 +64,7 @@ ok(exists $list_result->{$id},"object and list are written to database upon dest
 
 # reconstitute Trudy
 my $cursor = $autodb->find(-collection=>'Person', -name=>'Trudy');
-print Dumper $cursor;
+#print Dumper $cursor;
 my $trudy_lives_again = $cursor->{objects}->[0];
 
 # test with joe obj (already in db)
@@ -74,6 +73,3 @@ is($bill_lives_again->[0]->name, "Bill");
 #TODO: test with outsider object
 
 }
-
-# cleanup
-# &DBConnector::DESTROY;

@@ -5,5 +5,5 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     'NAME'		=> 'Class::AutoDB',
     'VERSION_FROM'	=> 'lib/Class/AutoDB.pm', # finds $VERSION
-    'PREREQ_PM'		=> { Class::AutoClass => 0.01 }, 
+    'PREREQ_PM'		=> { Class::AutoClass => 0.04 }, 
 );

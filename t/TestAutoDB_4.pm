@@ -1,5 +1,6 @@
-# same as TestAutoDB_4, but without %AUTODB connection params
 package TestAutoDB_4;
+# same as TestAutoDB_3, but without %AUTODB connection params
+use lib qw(. t ../lib);
 use strict;
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS %AUTODB);
 use Class::AutoClass;

@@ -8,12 +8,10 @@ use Class::AutoDB::Registration;
 use Class::AutoDB::Collection;
 @ISA = qw(Class::AutoClass);
 
-BEGIN {
   @AUTO_ATTRIBUTES=qw(autodb oid object_table name2coll _exists);
   @OTHER_ATTRIBUTES=qw();
   %SYNONYMS=();
   Class::AutoClass::declare(__PACKAGE__,\@AUTO_ATTRIBUTES,\%SYNONYMS);
-}
 
 use vars qw($REGISTRY $REGISTRY_OID $OBJECT_TABLE $OBJECT_COLUMNS);
 $REGISTRY_OID=1;		# object id for registry
@@ -22,15 +20,14 @@ $OBJECT_COLUMNS=qq(id int not null auto_increment, primary key (id), object long
 
 sub _init_self {
   my($self,$class,$args)=@_;
+  $self->_exists(0);
   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
   $self->object_table || $self->object_table($OBJECT_TABLE);
   if($args->autodb){
   	$self->autodb($args->autodb);
   	$args->get;
-    $self->get && $self->autodb && $self->autodb->is_connected;
   }
 }
-
 sub register {
   my $self=shift;
   my $registration=new Class::AutoDB::Registration(@_);
@@ -73,7 +70,7 @@ sub merge {
 sub exists {
   my ($self)=@_;
   my $autodb = $self->autodb;
-  $self->throw("Cannot open registry without a connected database") unless $autodb && $autodb->is_connected;
+  return 0 unless $autodb && $autodb->is_connected;
   return $self->_exists if ( defined $self->_exists && $self->_exists);
   my $dbh=$autodb->dbh;
   my $object_table=$self->object_table;

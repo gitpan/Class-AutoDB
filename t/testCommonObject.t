@@ -5,9 +5,7 @@
 ## _will_ have the same UID, which is embedded in the object
 ##
 
-use lib 't/';
-use lib 'lib/';
-use Data::Dumper;
+use lib qw(. t ../lib);
 use strict;
 use Scalar::Util;
 use Thing;
@@ -74,5 +72,3 @@ my $bill_list_uid = $bill->friends->[0]->{UID};
 ok($joe_list_uid eq $bill_list_uid, "UID is the same for both snapshots of the same object");
 }
 
-# cleanup
-&DBConnector::DESTROY;

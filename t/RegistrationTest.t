@@ -1,6 +1,5 @@
-use lib 't/';
+use lib qw(. t ../lib);
 use Test::More qw/no_plan/;
-#use Data::Dumper;
 use Class::AutoDB;
 use Class::AutoDB::Collection;
 use Class::AutoDB::Registration;

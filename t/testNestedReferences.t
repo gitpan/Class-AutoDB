@@ -38,9 +38,7 @@
 # eddy->friends->[1]->name is "Chris"
 
 
-use lib 't/';
-use lib 'lib/';
-use Data::Dumper;
+use lib qw(. t ../lib);
 use strict;
 use Scalar::Util;
 use Thing;
@@ -64,13 +62,7 @@ $chris->friends([$eddy]);
 $thelma->friends([$eddy]); # and by association, joe and chris
 }
 
-&Class::AutoClass::DESTROY($joe);
-&Class::AutoClass::DESTROY($chris);
-&Class::AutoClass::DESTROY($eddy);
-&Class::AutoClass::DESTROY($thelma);
-
-{
-require 'DBConnector.pm';
+# create AutoDB obj for storage
 my $autodb =
   Class::AutoDB->new(
                             -dsn=>"DBI:$DBConnector::DB_NAME:database=$DBConnector::DB_DATABASE;host=$DBConnector::DB_SERVER",
@@ -78,6 +70,13 @@ my $autodb =
 			                -password=>$DBConnector::DB_PASS
 		                  );
 
+# destroy the Thing objects (force them to store)
+&Class::AutoClass::DESTROY($joe);
+&Class::AutoClass::DESTROY($chris);
+&Class::AutoClass::DESTROY($eddy);
+&Class::AutoClass::DESTROY($thelma);
+
+{
 my $cursor = $autodb->find(-collection=>'Thing');
 my @stuff = $cursor->get;
 #print Dumper @stuff;
@@ -121,6 +120,3 @@ is($thelma->friends->[0]->name, "Eddy");# eddy is a friend of Thelma
 # };
 
 }
-
-# cleanup
-&DBConnector::DESTROY;

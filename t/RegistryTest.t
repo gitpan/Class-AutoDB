@@ -1,11 +1,11 @@
-use lib 't/';
+use lib qw(. t ../lib);
 use Test::More qw/no_plan/;
-use Data::Dumper;
 use Class::AutoDB;
 use Class::AutoDB::Registry;
 use Class::AutoDB::Registration;
 use DBConnector;
 use DBI;
+use Data::Dumper; # just for testing
 use strict;
 
 use vars qw($REGISTRY $REGISTRY_OID $OBJECT_TABLE $OBJECT_COLUMNS);
@@ -20,7 +20,7 @@ my $autodb = Class::AutoDB->new(
                                  -user=>$DBConnector::DB_USER,
                                  -password=>$DBConnector::DB_PASS
                                );
-                               
+
 my $transientRegistryTestObject1 = new Class::AutoDB::Registry;
 my $transientRegistryTestObject2 = new Class::AutoDB::Registry;
 my $savedRegistryTestObject1 = new Class::AutoDB::Registry(
@@ -100,9 +100,7 @@ $savedRegistryTestObject2->register(
                                       -class=>'Class::Duck',
                                       -collection=>'Duck',
                                       -keys=>qq(species string, gender string, prey list(string)));
-  
-eval{ $transientRegistryTestObject1->exists };
-ok($@ =~ /EXCEPTION/, "exists throws exception unless connected to the database");
+
 is($savedRegistryTestObject1->exists,0,"registry does not exist in database without create");
 $savedRegistryTestObject2->create;
 is($savedRegistryTestObject2->exists,1,"created registry written to database");

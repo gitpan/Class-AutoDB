@@ -1,4 +1,5 @@
 package Person;
+use lib qw(. t ../lib);
 use strict;
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS %AUTODB);
 use Class::AutoClass;

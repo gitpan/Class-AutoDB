@@ -6,13 +6,13 @@ use Class::AutoClass;
 use Text::Abbrev;
 @ISA = qw(Class::AutoClass); # AutoClass must be first!!
 
-BEGIN {
+##BEGIN {
   @AUTO_ATTRIBUTES=qw(name 
 		      _keys);
   @OTHER_ATTRIBUTES=qw(keys);
   %SYNONYMS=();
   Class::AutoClass::declare(__PACKAGE__);
-}
+##}
 sub _init_self {
   my($self,$class,$args)=@_;
   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
