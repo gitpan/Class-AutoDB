@@ -1,0 +1,39 @@
+## ==> supporting files
+Changes
+INSTALL
+Makefile.PL
+MANIFEST
+## ==> tests 
+t/CollectionDiffTest.t
+t/CollectionTest.t
+t/CursorTest.t
+t/DBConnector.pm
+t/LookupTest.t
+t/Person.pm
+t/RegistrationTest.t
+t/RegistryDiffTest.t
+t/RegistryTest.t
+t/TableTest.t
+t/testAutoCreateConnectionParamsInConstructor.t
+t/testAutoCreateWithConnectionParams.t
+t/TestAutoDB_1.pm
+t/TestAutoDB_1_alter.pm
+t/TestAutoDB_2.pm
+t/TestAutoDB_3.pm
+t/TestAutoDB_4.pm
+t/testCommonObject.t
+t/testNestedReferences.t
+t/testObjectCreationAlterationStorageWithCrossReferences.t
+t/testSimpleCycle.t
+t/testSimpleObjectCreationAlterationStorage.t
+t/Thing.pm
+## ==> code 
+lib/Class/AutoDB.pm
+lib/Class/AutoDB/Collection.pm
+lib/Class/AutoDB/CollectionDiff.pm
+lib/Class/AutoDB/Cursor.pm
+lib/Class/AutoDB/Lookup.pm
+lib/Class/AutoDB/Registration.pm
+lib/Class/AutoDB/Registry.pm
+lib/Class/AutoDB/RegistryDiff.pm
+lib/Class/AutoDB/Table.pm

@@ -1,0 +1,654 @@
+package Class::AutoDB::Registry;
+use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
+use strict;
+use Data::Dumper;
+use Class::AutoClass;
+use Class::AutoClass::Args;
+use Class::AutoDB::Registration;
+use Class::AutoDB::Collection;
+@ISA = qw(Class::AutoClass);
+
+BEGIN {
+  @AUTO_ATTRIBUTES=qw(autodb oid object_table name2coll _exists);
+  @OTHER_ATTRIBUTES=qw();
+  %SYNONYMS=();
+  Class::AutoClass::declare(__PACKAGE__,\@AUTO_ATTRIBUTES,\%SYNONYMS);
+}
+
+use vars qw($REGISTRY $REGISTRY_OID $OBJECT_TABLE $OBJECT_COLUMNS);
+$REGISTRY_OID=1;		# object id for registry
+$OBJECT_TABLE='_AutoDB';	# default for Object table
+$OBJECT_COLUMNS=qq(id int not null auto_increment, primary key (id), object longblob);
+
+sub _init_self {
+  my($self,$class,$args)=@_;
+  return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
+  $self->object_table || $self->object_table($OBJECT_TABLE);
+  if($args->autodb){
+  	$self->autodb($args->autodb);
+  	$args->get;
+    $self->get && $self->autodb && $self->autodb->is_connected;
+  }
+}
+
+sub register {
+  my $self=shift;
+  my $registration=new Class::AutoDB::Registration(@_);
+  my $name2coll=$self->name2coll || $self->name2coll({});
+  my @collections=$registration->collections;
+  for my $name (@collections) {
+    my $collection=$name2coll->{$name} || 
+      ($name2coll->{$name}=new Class::AutoDB::Collection(-name=>$name));
+    $collection->register($registration);
+  }
+  $registration;
+}
+sub collections {
+  my $self=shift;
+  my $name2coll=$self->name2coll || $self->name2coll({});
+  wantarray? values %$name2coll: [values %$name2coll];
+}
+sub collection {
+  my $self=shift;
+  my $name=!ref $_[0]? $_[0]: $_[0]->name;
+  my $name2coll=$self->name2coll || $self->name2coll({});
+  $name2coll->{$name};
+}
+sub merge {
+  my($self,$diff)=@_;
+  $self->throw('merge only operates on RegistryDiff objects') unless (ref($diff) eq 'Class::AutoDB::RegistryDiff');
+  my $name2coll=$self->name2coll || $self->name2coll({});
+  my $new_collections=$diff->new_collections;
+  for my $collection (@$new_collections) {
+    my $name=$collection->name;
+    $name2coll->{$name}=$collection; # easy case -- just add to registry
+  }
+  my $expanded_diffs=$diff->expanded_diffs;
+  for my $diff (@$expanded_diffs) {
+    my $collection=$diff->baseline;
+    $collection->merge($diff);   
+  }
+}
+# checks if registry is in db
+sub exists {
+  my ($self)=@_;
+  my $autodb = $self->autodb;
+  $self->throw("Cannot open registry without a connected database") unless $autodb && $autodb->is_connected;
+  return $self->_exists if ( defined $self->_exists && $self->_exists);
+  my $dbh=$autodb->dbh;
+  my $object_table=$self->object_table;
+  my $tables=$dbh->selectall_arrayref(qq(show tables));
+  my $exists=grep {lc($object_table) eq $_->[0]} @$tables;
+  $self->_exists($exists||0);
+}
+
+# prepare registry for insertion
+sub create {
+  my $self=shift;
+  my @collections=_flatten(@_);
+  my $autodb=$self->autodb;
+  $self->throw("Cannot create registry or collections without a connected database") unless $autodb && $autodb->is_connected;
+  my $dbh=$autodb->dbh;
+  if (!@collections || $self->name2coll) {		# create entire registry
+    $self->drop if $self->exists;
+    # create object table
+    my $object_table=$self->object_table;
+    my $sql="create table $object_table\($OBJECT_COLUMNS\)";
+    $dbh->do($sql);
+    $self->put;
+    $self->_exists(1);
+    @collections=$self->collections;
+  } else {
+    $self->throw("Cannot create collections unless the registry already exists") if !$self->exists;
+    $self->drop(@collections);	# drop existing tables
+  }
+  my @sql=map {$_->schema('create')} @collections;
+  for my $sql (@sql) {
+    $dbh->do($sql);
+  }
+}
+
+sub drop {
+  my $self=shift;
+  my @collections=_flatten(@_);
+  my $autodb=$self->autodb;
+  $self->throw("Cannot drop registry or collections without a connected database") unless $autodb && $autodb->is_connected;
+  my $dbh=$autodb->dbh;
+  if (!@collections) {		# drop entire registry
+    # drop object table
+    my $object_table=$self->object_table;
+    my $sql="drop table if exists $object_table";
+    $dbh->do($sql);
+    $self->_exists(0);
+    @collections=$self->collections;
+  } else {
+  my @sql=map {$_->schema('drop')} @collections;
+  for my $sql (@sql) {
+    $dbh->do($sql);
+  }
+ }
+}
+sub alter {
+  my $self=shift;
+  my @diffs=_flatten(@_);
+  my $autodb=$self->autodb;
+  $self->throw("Cannot drop registry or collections without a connected database") unless $autodb && $autodb->is_connected;
+  my $dbh=$autodb->dbh;
+  my @sql;
+  for my $diff (@diffs) {
+    my $collection=$diff->other;
+    push(@sql,$collection->alter($diff));
+  }
+  for my $sql (@sql) {
+    $dbh->do($sql);
+  }
+}
+
+sub do_sql {
+  my $self=shift;
+  my @sql=_flatten(@_);
+  my $autodb=$self->autodb;
+  $self->throw("Cannot run SQL without a connected database") unless $autodb && $autodb->is_connected;
+  my $dbh=$autodb->dbh;
+  for my $sql (@sql) {
+    $dbh->do($sql);
+  }
+}
+
+sub get {
+  my $self=shift;
+  my $args=new Class::AutoClass::Args(@_);
+  my $autodb=$self->autodb;
+  $self->throw("Cannot open registry without a connected database") unless $autodb && $autodb->is_connected;
+  my $dbh=$autodb->dbh;
+  if ($self->exists) {		# get from database if it exists
+    my $object_table=$self->object_table;
+    my($freeze)=$dbh->selectrow_array
+      (qq(select object from $object_table where id=$REGISTRY_OID));
+    my $thaw;			# variable used in $DUMPER
+    eval $freeze;		# sets $thaw
+    @$self{keys %$thaw}=values %$thaw; # copy from saved registry to self
+    wantarray ? values %{$thaw->{name2coll}} : [values %{$thaw->{name2coll}}];
+  }
+}
+# insert registry into database
+sub put {
+  my($self)=@_;
+  my $autodb=$self->autodb;
+  $self->throw("Cannot put registry without a connected database") unless $autodb && $autodb->is_connected;
+  # Make a shallow copy, deleting transient attributes
+  my $copy={_CLASS=>ref($self)};
+  while(my($key,$value)=each %$self) {
+    next if grep {$key eq $_} qw(autodb _exists);
+    $copy->{$key}=$value;
+  }
+  map {$_->tidy;} @{$self->collections}; # remove transient data from collections
+  my $dumper=new Data::Dumper([undef],['thaw'])->Purity(1)->Indent(0);
+  my $freeze=$dumper->Values([$copy])->Dump;
+  my $dbh=$autodb->dbh;
+  my $object_table=$self->object_table;
+
+   ## TODO: flow is icky. create makes collection table and calls put, so
+   ## that $self->exists is true while $self->_exists if false
+   my $sth= $self->_exists ?
+     $dbh->prepare(qq(update $object_table set object=? where id=$REGISTRY_OID)) :
+       $dbh->prepare (qq(insert into $object_table(id, object) values($REGISTRY_OID,?)));
+   $sth->bind_param(1,$freeze);
+   $sth->execute;
+}
+
+sub _flatten { 
+  map {'ARRAY' eq ref $_? @$_: $_} @_; 
+}
+
+1;
+
+
+__END__
+
+	# POD documentation - main docs before the code
+
+=head1 NAME
+
+Class::AutoDB::Registry - Database registry for Class::AutoDB
+
+=head1 SYNOPSIS
+
+Used by Class::AutoDB to keep track of the classes and collections
+being managed by the AutoDB system.  Most users will never use this
+class explicitly. The synopsis show approximately how the class is
+used by AutoDB itself.
+
+  use Class::AutoDB;
+  use Class::AutoDB::Registry;
+  $autodb=new Class::AutoDB(
+		      -dsn=>'dbi:mysql:database=some_database;host=some_host',
+ 		      -user=>'some_user',
+		      -password=>'some_password');
+  my $registry=new Class::AutoDB::Registry;
+  $registry->register(
+               -class=>'Class::Person',
+               -collection=>'Person',
+               -keys=>qq(name string, sex string, friends list(string)));
+  #@registrations=$registry->registrations;  # return all registrations
+  @collections=$registry->collections;      # return all collections that have 
+                                            # been registered
+#  @tables=$registry->tables;	            # return all tables needed to implement
+#                                           # all collections
+#  @tables=$registry->tables(-collection=>'Person'); # return tables needed to 
+#                                                    # implement one collection
+#  %columns=$registry->columns(-table=>$table); # return columns and SQL data types
+#                                               # for table
+
+  my $saved_registry=new Class::AutoDB::Registry
+         (-autodb=>$autodb,
+          -object_table=>'_AutoDB_Object');# get saved registry from database
+
+  confess "New registry inconsistent with saved one" 
+     unless $registry->is_consistent($saved_registry);
+  if ($registry->is_sub($saved_registry) { # is new registry subset of saved one?
+    $registry=$saved_registry;             # then used saved one
+  } elsif  ($registry->is_different($saved_registry)) {	  
+    # get changes -- new collections and collections with new columns
+    my @new_collections=$registry->self_only_collections($saved_registry);
+    for my $collection (@new__collections) {
+        $saved_registry->create($collection);
+    }
+    my @expanded_collections=$registry->expanded_collections($saved_registry);
+    for my $collection (@expanded_collections) {
+      my $saved_collection=$saved_registry->collection($collection);
+      $saved_registry->alter($saved_collection,$collection);
+      }
+    }
+    $registry=$saved_registry;            # saved registry now reflects changes
+    $saved_registry->put;                 # store it in database for next time
+
+  # Other commonly used methods
+
+  $registry->drop;		          # drop entire database
+  $registry->drop('Person');              # drop one collection
+  $registry->create;                      # create entire database
+  $registry->create('Person');            # create one collection
+
+=head1 DESCRIPTION
+
+This class maintains the schema information for an AutoDB
+database.  There should only be one registry per database (since a registry 
+is meant to define a database), but there can be two versions of it. 
+
+1.  An in-memory version generated by calls to the 'register'
+    method.  This method is usually called automatically when
+    AutoClass processes %AUTO_PERSISTENCE declarations from classes as
+    they are loaded.  The 'register' method can also be called
+    explicitly at runtime.
+
+2.  A database version. The stored version is supposed to reflect
+    the real structure of the AutoPeristence database.  (Someday we
+    will provide a method for confirming this.)
+
+Before the AutoDB mechanism can run, it must ensure that the
+in-memory version is self-consistent, and that the in-memory and
+database versions are mutually consistent.  (It doesn't have to check
+the database version for self-consistency since the software won't
+store an inconsistent version.)
+
+The in-memory version is inconsistent if the same search key is
+registered for a collection with different data types.  The in-memory
+and database versions are inconsistent if the combination has this
+property.
+
+The in-memory and database versions of the registry can be different
+but consistent if the running program registers only a subset of the
+collections that are known to the system, or registers a subset of the
+search keys for a collection.  This is a very common case and requires
+no special action.
+
+The in-memory and database versions can also be different but
+consistent if the running program adds new collections or new search
+keys to an existing collection.  In this case, the database version of
+the registry and the database itself must be updated to reflect the
+new information.  Methods are provided to effect these changes.
+
+=head1 KNOWN BUGS AND CAVEATS
+
+This is still a work in progress.  
+
+=head2 Bugs, Caveats, and ToDos
+
+  TBD
+
+=head1 AUTHOR - Nat Goodman, Chris Cavnor
+
+Email natg@shore.net
+
+=head1 COPYRIGHT
+
+Copyright (c) 2003 Institute for Systems Biology (ISB). All Rights Reserved.
+
+This module is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=head1 APPENDIX
+
+The rest of the documentation describes the methods.
+
+=head2 Constructors
+
+ Title   : new
+
+ Usage   : $registry=new Class::AutoDB::Registry;
+ Function: Create new empty registry
+ Returns : New registry object
+ Args    : none
+
+ -- OR --
+
+ Usage   : $saved_registry=new Class::AutoDB::Registry
+                (-autodb=$autodb,
+                 -object_table=>'_AutoDB');
+ Function: Retrieved saved registry from database
+ Args    : -autodb	 AutoDB object for database.  Must be connected!
+           -object_table Name of table that stores AutoDB objects
+                         Default: _AutoDB
+ Returns : Registry object retrieved from the database
+
+
+=head2 Simple attributes
+
+These are methods for getting and setting the values of simple
+attributes. Some of these should be read-only (more precisely, should
+only be written by code internal to the object), but this is not
+enforced. 
+
+Methods have the same name as the attribute.  To get the value of
+attribute xxx, just say $xxx=$object->xxx; To set it, say
+$object->xxx($new_value); To clear it, say $object->xxx(undef);
+
+ Attr    : autodb
+ Function: Class::AutoDB object connected to database
+ Access  : read-write
+
+ Attr    : oid
+ Function: Object id of saved registry
+ Access  : read-only
+
+ Attr    : registrations
+ Function: array or ARRAY ref of registrations
+ Access  : read-only (no mutator provided even for internal use)
+
+ Attr    : coll2reg
+ Function: hash or HASH ref mapping collection names to registrations
+ Access  : read-only (no mutator provided even for internal use)
+
+
+=head2 registrations
+
+ Title   : register
+ Usage   : $registry->register(
+                  -class=>'Class::Person',
+                  -collection=>'Person',
+                  -keys=>qq(name string, sex string, friends list(string)));
+ Function: Registers a class/collection with the system. 
+ Args    : -class       => name of class being registered
+           -collection  => name of collection that will hold objects, or
+                           ARRAY of collection names
+           -collections => synonym for -collection
+           -keys        => specification of search keys for collection(s) -- see below
+           -skip        => ARRAY of attributes that will not be stored.  This is
+                           useful for objects that contain computed values or other 
+                           information of a transient nature.
+           -auto_get    => ARRAY of attributes that are automatically retrieved
+                           when objects of this class are retrieved. These should be
+                           attributes that refer to other auto-persistent objects.
+                           This useful in cases where there are attributes that are 
+                           used so often that it makes sense to retrieve them as soon 
+                           as possible.
+  Returns : Class::AutoDB::Registration object
+
+The 'keys' parameter consists of attribute, data type pairs.  Each
+attribute is generally an attribute defined in the AutoClass
+@AUTO_ATTRIBUTES or @OTHER_ATTRIBUTES variables.  (Technically, it's
+the name of a method that can be called with no arguments.) The value
+of an attribute must be a scalar, an object reference, or an ARRAY (or
+list) of such values.) 
+
+The data type can be 'string', 'integer', 'float', 'object', any legal
+MySQL column type, or the phrase list(<data type>), eg,
+'list(integer)'.
+
+NB: At present, only our special data types ('string', 'integer',
+'float', 'object') are supported. These can be abbreviated.
+
+The 'keys' parameter can also be an array of attribute names, eg,
+
+    -keys=>[qw(name sex)]
+
+in which case the data type of each attribute is assumed to be
+'string'.  This works in many cases even if the data is really
+numeric as discussed in the Persistence Model section.
+
+The types 'object' and 'list(object)' only work for objects whose
+persistence is managed by AutoDB.
+
+=head2 collections
+
+ Title   : collections
+ Usage   : $collections=$registry->collections;
+          -- OR --
+           @collections=$registry->collections;
+ Function: Return collections contained in registry
+ Args    : None
+ Returns : array or ARRAY ref of Class::AutoDB::Collection objects
+
+ Title   : collection
+ Usage   : $collection=$registry->collection($collection);
+ Function: Return collection object
+ Args    : Name of collection or collection object. 
+ Returns : Class::AutoDB::Collection object
+ 
+ Title   : get
+ Usage   : $got=$registry->get;
+ Function: Return a Registry object containing all stored collections
+ Args    : None. 
+ Returns : a Class::AutoDB::Registry object containing Class::AutoDB::Collection objects
+
+ Title   : merge
+ Usage   : $registry->merge($diff));
+ Function: Merge differences into registry
+ Args    : Class::RegistryDiff object reflecting difference between this registry 
+           and a new one       
+ Returns : Nothing
+
+If the registry does not contain a collection of the same name, the
+new collection is simply added to the registry. If the registry
+contains a collection of the same name, the information from the new
+collection is merged with the existing collection.  It is an error if
+the merged information is not consistent.
+
+#=head2 tables
+
+# Usage   : $tables=$registry->tables;
+#          -- OR --
+#           @tables=$registry->tables;
+# Function: Return tables needed to implement registry's collections
+# Args    : None
+# Returns : array or ARRAY ref of Class::AutoDB::Table objects
+
+=head2 Operations that touch the database
+
+These methods read or write the actual database structure. They are only
+legal if the registry is connected to the database.
+
+ Title   : exists
+ Usage   : $registry->exists
+ Function: Tests whether the registry exists in the database
+ Args    : None
+ Returns : 0 or 1 indicate the registry does not or does exist
+           undef is used internally to indicate that we don't know the answer
+
+The registry is declared to exist if the AutoDB object table exists in
+the database.  The method checks whether this is so and caches the
+result in the _exists attribute.  Subsequent calls use the cached
+version.  The create and drop methods update _exists.
+
+ Title   : create
+ Usage   : $registry->create
+           -- OR --
+           $registry->create(@collections)
+ Function: Create entire registry or tables needed to implement the listed 
+           collections
+ Args    : array or ARRAY ref of 0 or more collection names or objects
+ Returns : Nothing
+
+With no arguments, this creates the entire registry including the
+AutoDB object table.  If the registry already exists, it is dropped
+first.
+
+With arguments, the method just creates the tables needed to implement
+the listed collections.  If the tables already exist, they are dropped
+first. In this case, it is an error if the registry does not already
+exist.
+
+ Title   : drop
+ Usage   : $registry->drop
+           -- OR --
+           $registry->drop(@collections)
+ Function: Drop entire registry or tables needed to implement the listed 
+           collections
+ Args    : array or ARRAY ref of 0 or more collection names or objects
+ Returns : Nothing
+
+With no arguments, this drops the entire registry including the AutoDB
+object table. With arguments, the method just drops the tables needed
+to implement the listed collections.
+
+In both cases, the code tries to do the drop even if it appears the
+registry does not exist.
+
+ Title   : alter
+ Usage   : $registry->alter(@diffs)
+ Function: Expand collections to reflect the diffs
+ Args    : array or ARRAY ref of 0 or more CollectionDiffs
+ Returns : Nothing
+
+Each argument is a CollectionDiff that compares the saved registry
+with a new one.  Each should be an expanded collection.  The method
+alters and creates the tables needed to implement the changes.
+
+ Title   : do_sql
+ Usage   : $registry->do_sql(@sql);
+ Function: Utility function to run SQL statements
+ Args    : array or ARRAY ref of SQL statements (as strings)
+ Returns : Nothing
+
+IT is an error if the registry does not already exist.
+
+ Title   : put
+ Usage   : $registry->put
+ Function: Store registry in database
+ Args    : Nothing
+ Returns : Object id for registry (always the same at present)
+
+=head2 Comparison methods
+
+These methods compare two registries and report on differences.  Since
+the underlying comparison process is relatively slow, comparison
+results are cached within the registry.  This shoudld be trasparent in
+normal use, but you must call cmp_reset if you wish to force a
+comparison to be redone, eg if you change the 'other_registry'.
+
+ Title   : cmp_reset
+ Usage   : $registry->cmp_status
+           -- OR --
+           $registry->cmp_status($other_registry)
+ Function: Reset comparison cache for one or all other registries
+ Args    : registry being compared with this one (optional)
+ Returns : true/false values
+
+ Title   : self_only_collections
+ Usage   : @collections=$registry->self_only_collections($other_registry);
+          -- OR --
+           $collections=$$registry->self_only_collections($other_registry);
+ Function: Return collections present in this registry but not other
+ Args    : registry being compared with this one
+ Returns : array or ARRAY ref of Class::AutoDB::Collection objects
+
+ Title   : other_only_collections
+ Usage   : @collections=$registry->other_only_collections($other_registry);
+          -- OR --
+           $collections=$$registry->other_only_collections($other_registry);
+ Function: Return collections present in other registry but not this one
+ Args    : registry being compared with this one
+ Returns : array or ARRAY ref of Class::AutoDB::Collection objects
+
+ Title   : expanded_collections
+ Usage   : @collections=$registry->expanded_collections($other_registry);
+          -- OR --
+           $collections=$$registry->expanded_collections($other_registry);
+ Function: Return collections that have additional search keys in this registry 
+           than the other.
+ Args    : registry being compared with this one
+ Returns : array or ARRAY ref of Class::AutoDB::Collection objects
+
+ Title   : shrunk_collections
+ Usage   : @collections=$registry->shrunk_collections($other_registry);
+          -- OR --
+           $collections=$$registry->shrunk_collections($other_registry);
+ Function: Return collections that are missing search keys in this registry 
+           compared to the other.
+ Args    : registry being compared with this one
+ Returns : array or ARRAY ref of Class::AutoDB::Collection objects
+
+ Title   : is_consistent
+ Usage   : $status=$registry->is_inconsistent($other_registry)
+ Function: Check if registries are consistent
+ Args    : registry being compared with this one
+ Returns : true/false values
+
+ Title   : is_inconsistent
+ Usage   : $status=$registry->is_inconsistent($other_registry)
+ Function: Check if registries are inconsistent
+ Args    : registry being compared with this one
+ Returns : true/false values
+
+ Title   : is_equivalent
+ Usage   : $status=$registry->is_equivalent($other_registry)
+ Function: Check if registries are equivalent.
+ Args    : registry being compared with this one
+ Returns : true/false values
+
+ Title   : is_different
+ Usage   : $status=$registry->is_different($other_registry)
+ Function: Checkif registries are not equivalent.
+ Args    : registry being compared with this one
+ Returns : true/false values
+
+ Title   : is_sub
+ Usage   : $status=$registry->is_sub($other_registry)
+ Function: Check if this registry is subset of other.  Note: equivalent is 
+           considered subset.
+ Args    : registry being compared with this one
+ Returns : true/false values
+
+ Title   : is_super
+ Usage   : $status=$registry->is_super($other_registry)
+ Function: Check if this registry is superset of other. Note: equivalent is 
+           considered subset.
+ Args    : registry being compared with this one
+ Returns : true/false values
+
+# Title   : is_expanded
+# Usage   : $status=$registry->is_expanded($other_registry)
+# Function: Check if this registry contains collections that are expanded
+#           relative to the other. 
+# Args    : registry being compared with this one
+# Returns : true/false values
+
+# Title   : is_shrunk
+# Usage   : $status=$registry->is_shrunk($other_registry)
+# Function: Check if this registry contains collections that are shrunk
+#           relative to the other. 
+# Args    : registry being compared with this one
+# Returns : true/false values
+
+=cut
