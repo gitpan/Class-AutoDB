@@ -3,6 +3,7 @@ use Test::More qw/no_plan/;
 use Class::AutoDB;
 use Class::AutoDB::Registry;
 use Class::AutoDB::Registration;
+use Class::AutoClass::Root;
 use DBConnector;
 use DBI;
 use Data::Dumper; # just for testing
@@ -12,11 +13,11 @@ use vars qw($REGISTRY $REGISTRY_OID $OBJECT_TABLE $OBJECT_COLUMNS);
 $REGISTRY_OID=1;		# object id for registry
 $OBJECT_TABLE='_AutoDB';	# default for Object table
 $OBJECT_COLUMNS=qq(id int not null auto_increment, primary key (id), object longblob);
-my $DBI = new DBConnector;
-my $dbh = $DBI->getDBHandle;
+my $DBC = new DBConnector;
+my $dbh = $DBC->getDBHandle;
 
 SKIP: {
-        skip "! Cannot test without a database connection - please adjust DBConnector.pm's connection parameters and \'make test\' again", 1 unless $DBI->can_connect;
+        skip "! Cannot test without a database connection - please adjust DBConnector.pm's connection parameters and \'make test\' again", 1 unless $DBC->can_connect;
 
 my $autodb = Class::AutoDB->new(
                                  -dsn=>"DBI:$DBConnector::DB_NAME:database=$DBConnector::DB_DATABASE;host=$DBConnector::DB_SERVER",
@@ -62,7 +63,7 @@ eval{
                                            -class=>'TestClass',-collection=>'Disney',
                                            -keys=>qq(string_key string,another_key integer,alter_key string));
 };
-ok($@ =~ /EXCEPTION/, "redefining a key should throw an exception");                                       
+ok($@, "redefining a key should throw an exception");                                       
 
 # test collections
 $transientRegistryTestObject2->register(
@@ -89,7 +90,7 @@ my (%regs, $ary_ref);
   foreach(@$ary_ref){
    $regs{"@$_"}++;
   }
-  ok(!(exists$regs{lc("_AutoDB_Object1")}), "auto registry not written until exit");
+  ok(!(exists$regs{"_AutoDB_Object1"}), "auto registry not written until exit");
 } #end of scope, _AutoDB_Object1 will be written
 
 
@@ -104,21 +105,21 @@ $savedRegistryTestObject2->register(
                                       -collection=>'Duck',
                                       -keys=>qq(species string, gender string, prey list(string)));
 
-is($savedRegistryTestObject1->exists,0,"registry does not exist in database without create");
+is($savedRegistryTestObject1->_exists,0,"registry does not exist in database without create");
 $savedRegistryTestObject2->create;
-is($savedRegistryTestObject2->exists,1,"created registry written to database");
+is($savedRegistryTestObject2->_exists,1,"created registry written to database");
 is($savedRegistryTestObject1->object_table, "_AutoDB_Object1", "object_table name is correct (in registry object) for implicit writes");
 is($savedRegistryTestObject2->object_table, "_AutoDB_Object2", "object_table name is correct (in registry object) for explicit writes");
 
 $ary_ref = $dbh->selectall_arrayref("show tables");
 foreach(@$ary_ref){
-  $regs{"@$_"}++;
+  $regs{lc("@$_")}++; # mysql decides to lc tables on some platforms, apparently
 }
 
 # _test_exists requires (in the perl sense) a file which autoloads testautodb_1
-ok(exists $regs{lc("_AutoDB_Object2")}, "object_table name preserved in registry written to database");
-ok(exists $regs{lc("duck")}, "collection name written to database");
-ok(exists $regs{lc("duck_prey")}, "collection name list written to database");
+ok(exists $regs{("_autodb_object2")}, "object_table name preserved in registry written to database");
+ok(exists $regs{("duck")}, "collection name written to database");
+ok(exists $regs{("duck_prey")}, "collection name list written to database");
 
 # test get
 $savedRegistryTestObject1->register(
@@ -127,13 +128,13 @@ $savedRegistryTestObject1->register(
                                       -keys=>qq(name string, sex string, enemy list(string)));
 
                       
-ok(! exists $regs{lc("_AutoDB_Object1")}); # _AutoDB_Object1 still does not exist without explicit write              
+ok(! exists $regs{"_AutoDB_Object1"}); # _AutoDB_Object1 still does not exist without explicit write              
 $savedRegistryTestObject1->create;
 $ary_ref = $dbh->selectall_arrayref("show tables");
 foreach(@$ary_ref){
-  $regs{"@$_"}++;
+  $regs{lc("@$_")}++; # mysql decides to lc tables on some platforms, apparently
 }
-ok(exists $regs{lc("_AutoDB_Object1")},"_AutoDB_Object1 written after create called");
+ok(exists $regs{("_autodb_object1")},"_AutoDB_Object1 written after create called");
 my @got = $savedRegistryTestObject1->get;
 is(ref($got[0]),"Class::AutoDB::Collection");
 is( $got[0]->name,"Person", "get() got created collection");

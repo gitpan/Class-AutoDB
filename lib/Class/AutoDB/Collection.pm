@@ -7,12 +7,11 @@ use Class::AutoDB::Table;
 use Data::Dumper;
 @ISA = qw(Class::AutoClass); # AutoClass must be first!!
 
-##BEGIN {
-  @AUTO_ATTRIBUTES=qw(name _keys _tables _cmp_data);
-  @OTHER_ATTRIBUTES=qw(register);
-  %SYNONYMS=();
-  Class::AutoClass::declare(__PACKAGE__);
-##}
+@AUTO_ATTRIBUTES=qw(name _keys _tables _cmp_data);
+@OTHER_ATTRIBUTES=qw(register);
+%SYNONYMS=();
+Class::AutoClass::declare(__PACKAGE__);
+
 sub _init_self {
   my($self,$class,$args)=@_;
   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
@@ -43,7 +42,7 @@ sub merge {
   return unless UNIVERSAL::isa($diff, "Class::AutoDB::CollectionDiff");
   my $keys=$self->keys || {};
   my $new_keys=$diff->new_keys;
-  $self->warn("merging empty collections") unless (keys %{$diff->baseline} || keys %{$diff->other});
+  warn("merging empty collections") unless (keys %{$diff->baseline} || keys %{$diff->other});
   @$keys{keys %$new_keys}=values %$new_keys;
   $self->keys($keys);
   $self->_tables(undef);	# clear computed value so it'll be recomputed next time 
@@ -52,7 +51,7 @@ sub alter {
   my($self,$diff)=@_;
   my @sql;
   my $new_keys=$diff->new_keys;
-  my $name=$self->name || ( $self->warn('requires a named collection') and return);
+  my $name=$self->name || ( warn('requires a named collection') and return);
   # Split new keys to be added into scalar vs. list
   my($scalar_keys,$list_keys);
   while(my($key,$type)=each %$new_keys) {
@@ -77,7 +76,7 @@ sub tables {
   my $self=shift;
   return $self->_tables(@_) if @_;
   unless (defined $self->_tables) {
-    my $name=$self->name || ( $self->warn('requires a named collection') and return);
+    my $name=$self->name || $self->warn("no collection name specified, using system default: $Class::AutoDB::Registry::OBJECT_TABLE");
     # Collection has one 'base' table for scalar keys and one 'list' table per list key
     #
     # Start by splitting keys into scalar vs. list
@@ -112,7 +111,7 @@ sub _is_list_type {
   $_[0]=~/^list\s*\(/;
 }
 sub _flatten {
-	map {'ARRAY' eq ref $_? @$_: $_} @_;
+	map {'ARRAY' eq ref($_) ? @$_: $_} @_;
 }
   
 1;

@@ -1,6 +1,6 @@
 package Class::AutoDB;
-our $VERSION = '0.04';
-use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
+our $VERSION = '0.05';
+use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS @EXPORT);
 use strict;
 use DBI;
 use Class::AutoClass;
@@ -9,13 +9,14 @@ use Class::AutoClass::Root;
 use Class::AutoDB::Registry;
 use Class::AutoDB::RegistryDiff;
 use Class::AutoDB::Cursor;
+use Class::AutoDB::SmartProxy;
 use Data::Dumper;
-use Scalar::Util ();
-@ISA = qw(Class::AutoClass);
+@ISA=qw(Class::AutoClass Exporter);
+require Exporter;
+@EXPORT = qw/ref/;
 
-use Class::AutoDB::Lookup;
-my $lookup = new Class::AutoDB::Lookup;
-my %remember; # remember what collections are persistant
+# global static reference to weak cache
+my $wc = Class::AutoDB::WeakCache->instance();
 
 @AUTO_ATTRIBUTES=qw(dsn dbh dbd database host user password 
 		      read_only read_only_schema
@@ -35,24 +36,28 @@ sub auto_register {
 
 sub _init_self {
   my($self,$class,$args)=@_;
-  ## TODO: this needs to be an instance variable of AutoDB-able objs
-  $AUTODB = $self; # hold a global reference to AutoDB obj
   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
   $self->session(0);
   $self->registry || $self->registry($AUTO_REGISTRY);
+  $wc->cache($class,$self);
   $self->connect(%$args);
+
   my $find=$args->find;
   unless ($find) {
     return $self->_manage_registry($args);
   } else {
-    return $self->_manage_query($args,$find);
+  	# create registry if it doesn't already exist (this will happen when find is passed as a constructor param to AutoDB)
+  	$self->_manage_registry($args) unless $self->_registry_is_saved;
+    my $cursor=$self->_manage_query($args);
+    # AutoClass expects to send back an AutoClass object, so we displace it here
+    undef %$self;
+	%$self=%$cursor;
+    return bless $self, ref($cursor);
   }
 }
 sub _manage_query {
-  my($self,$args,$query)=@_;
-  if($query) {
-    $self->find($query);
-  }
+  my($self,$args)=@_;
+    $self->find($args->find);
 }
 
 sub _manage_registry {
@@ -69,14 +74,20 @@ sub _manage_registry {
   $self->throw("Schema changes not allowed by -read_only or -read_only_schema setting") if $count && $read_only_schema;
   # get saved registry and merge with in-memory registry
   my $in_memory=$self->registry;
-  my $saved=new Class::AutoDB::Registry(-autodb=>$self,-object_table=>$self->object_table,-get=>1);  
+  my $saved;
+  if ($self->_registry_is_saved) {
+    $saved=$self->_fetch_registry;
+  } else {
+    $saved=$AUTO_REGISTRY;
+    $create=1;
+  }
   my $diff=new Class::AutoDB::RegistryDiff(-baseline=>$saved,-other=>$in_memory);
-  if (!$diff->is_sub) {		# in-memory schema adds something to saved schema
+  unless ($diff->is_sub) {		# in-memory schema adds something to saved schema
     $self->throw("In-memory and saved registries are inconsistent") unless $diff->is_consistent;
     $self->throw("In-memory registry adds to saved registry, but schema changes are not allowed by -read_only or -read_only_schema setting") if $read_only_schema;
     unless ($count) {
       # if no options are set can only make default changes
-      if ($saved->exists) {	
+      if ($saved->_registry_is_saved) {	
         $self->throw("In-memory registry adds to saved registry, but schema alteration prevented by -alter=>0") if $alter eq 0;
         # alter-if--exists case -- can only add collections
         $self->throw("Some collections are expanded in-memory relative to saved registry.  Must set -alter=>1 to change saved registry") if $diff->has_expanded;
@@ -86,6 +97,7 @@ sub _manage_registry {
     }
     $saved->merge($diff);
   }
+  $self->registry->_exists(1);
   $self->registry($saved);
   $self->diff($diff);
   # Now do specified schema operations
@@ -94,9 +106,9 @@ sub _manage_registry {
   $self->alter, return if $alter;
   
   # Finally, do default schema operations if required
-  if (!$diff->is_sub) { # in-memory schema adds something to saved schema
-    $self->create, return if (!$saved->exists && $self->is_connected);
-    $self->alter, return if ($saved->exists && $self->is_connected);
+  unless ($diff->is_sub) { # in-memory schema adds something to saved schema  
+    $self->create, return if (!$saved->_registry_is_saved && $self->is_connected);
+    $self->alter, return if ($saved->_registry_is_saved && $self->is_connected);
   }
   return $self;
 }
@@ -104,7 +116,7 @@ sub connect {
   my($self,@args)=@_;
   my $args=new Class::AutoClass::Args(@args);
   $self->Class::AutoClass::set_attributes([qw(dbh dsn dbd host server user password database)],$args);
-  $self->_connect();# if $self->dbh;
+  $self->_connect();
 }
 sub _connect {
   my($self)=@_;
@@ -155,37 +167,30 @@ sub alter {
   $self->diff(undef);		# registries are now in synch
 }
 
-sub exists {
-  my $self = shift;
-  #print Dumper $self;
+# checks that the registry exists
+sub _registry_is_saved {
+  my $self=shift;
   $self->throw("there is no established database connection") unless $self->is_connected;
-  ## use AutoDB's dsn entry if it is more complete than registry's copy
-  ##  unless( $self->registry->autodb->dsn =~ /database=(\w+)\:/ ){
-  ##    unless($self->dsn =~ /database=(\w+)[\:\;]/){
-  ##		warn("you have not specified a database in your connection parameters");
-  ##    } else {
-  ##    	  #dbh based on incomplete dsn
-  ##        $self->registry->autodb->{dbh} = $self->dbh;
-  ##    }
-  ##}
-  $self->registry->exists ? 1 : 0;
+  $self->registry->exists($self->dbh) ? 1 : 0;
 }
 
-# receives a session-oriented Registry object from _manage_query
-# throw a warning if the collections are not found in the data store.
-# they may be in memory still, but we are not yet handling that case.
-# the safe way out is to use AutoDB::commit  before calling find()
-## make sure to commit.
+sub _fetch_registry {
+  my $self=shift;
+  $self->throw("there is no established database connection") unless $self->is_connected;
+  $self->registry->fetch($self->dbh);
+}
+
+# returns a Class::AutoDB::Cursor object for objects in the data store which satisfy the query
 sub find {
   my($self,@query)=@_;
   my %normalized = _flatten(@query);
   my $args = new Class::AutoClass::Args(%normalized);
-  my $cursor;
-  $self->exists || $self->throw("registry was not found in the database");
+  $self->_registry_is_saved || $self->throw("registry was not found in the database");
   
   if(defined $args->collection) {
     # need to return a cursor obj
-    my $collections = $self->registry->get;
+    my $cursor;
+    my $collections = $self->registry->get($self->dbh);
     my $collection_to_find = $args->collection;
     foreach my $collection (@$collections){
       next unless lc($collection->name) eq lc($collection_to_find);
@@ -194,6 +199,7 @@ sub find {
       $cursor = Class::AutoDB::Cursor->new(-collection=>$collection, -search=>$keys, -dbh=>$self->dbh);
     }
     warn("collection \'$collection_to_find\' was not found in the database") unless $cursor;
+    return $cursor ? $cursor : undef;
   }
   elsif($query[0] =~ /^select/i) {
     $self->throw("free-form query not yet supported");
@@ -203,152 +209,115 @@ sub find {
   	$self->throw("query must either contain a collection argument or be a free-form SELECT statement");
   	return;
   }
-  return $cursor;
 }
 
-# store the nvp's in the database
 sub store{
-  my ($self,$persistable,$persistable_name)=@_;
-  next unless values %$persistable;
-  my $object_table = $self->registry->object_table;
+  my ($self,$id)=@_;
+  return unless $wc->exists($id);
+  my $persistable=$wc->recall($id);
+  # state=new for insertable objects, state=update for updatable objects - otherwise skip
+  $persistable->{__state} ? my $state = $persistable->{__state} : return;
+  my $persistable_name = $persistable->{__proxy_for} || $self->throw("Not sure who object is proxying");
   my $registry = $self->registry;
-  my $dbh=$self->dbh;
-  my $lookup_table = $registry->object_table;
-  my $object_id = $persistable->{__object_id}; # only present if collection pulled from database
-  my $class_table = ref($persistable);
-  my (@collKeys, @collValues, %list, $this_list);
-  
-  # give UID (__object_id will override if present)
-  $persistable->{UID} = _getUID() unless ( $persistable->{UID} || $persistable->{__object_id} );
-  # only interested in subset of keys in the persistable objects
-  while(my($k,$v) = each %{$registry->name2coll->{$persistable_name}->_keys}) {      
-    # handle lists
-    if($v =~ /list\(\w+\)/){
-      next unless $persistable->{$k};
-      my $listname = "$persistable_name"."_$k";
-      $list{$listname} = $persistable->{$k};
-      # consider list to be handled
-      delete $persistable->{$k};
-    }
-    push @collKeys, $k if exists $persistable->{$k};
-    push @collValues, $v if exists $persistable->{$k};
+  my $dbh=$self->dbh || $self->connect;
+  my $object_id = $persistable->{__object_id} || $self->throw("No object ID was associated with this object");
+  my (@collKeys, @collValues, %list);
+	# serialize whole object
+	my $dumper=new Data::Dumper([$persistable],['thaw'])->Purity(1)->Indent(0)->Reset;
+	my $freeze=$dumper->Dump;
+
+  # filter out all but the searchable keys
+  foreach my $collection ($registry->collections) {
+    next unless $collection->name eq $persistable_name;
+    my @insertable=();
+	  	while(my($k,$v) = each %{$collection->_keys}) {
+		    # handle lists
+		    if($v =~ /list\(\w+\)/) {
+		      next unless $persistable->{$k};
+		      $self->throw('list must be an array ref') unless ref($persistable->{$k}) eq 'ARRAY';
+			   foreach my $item (@{$persistable->{$k}}) {
+		        # if items are scalar, just inserted them. If they are SmartProxy objects, insert IDs
+		        push @insertable, ref($item) eq 'Class::AutoDB::SmartProxy' ? $item->{__object_id} : $item;
+		      }
+		      my $list_name = "$persistable_name"."_$k";
+		       my $dumper=new Data::Dumper([\@insertable],['thaw'])->Purity(1)->Indent(0)->Reset;
+			   my $freeze=$dumper->Dump;
+		      $list{$list_name}=$freeze;
+		      # delete from top-level search keys
+		      delete $persistable->{$k};
+		    }
+	    push @collKeys, $k if exists $persistable->{$k};
+	    push @collValues, $v if exists $persistable->{$k};
+	  }
+  }
+    my ($aggCollKeys,@aggInsertableValues,$aggInsertableValues);
+      # prepare searchable keys
+	  if (values %$persistable) {
+	  	($aggCollKeys) = join ",",'object', @collKeys;
+	  	while(my($k,$v) = each %$persistable) {
+	  	  next if $k =~ /^__/; # filter system nvp's
+	  	  push @aggInsertableValues, DBI::neat($v);
+	  	}
+	  	unshift @aggInsertableValues, $object_id;
+	  	($aggInsertableValues) = join ",", @aggInsertableValues;
+	  } else { # only the object_id is present
+	     $aggCollKeys = 'object';
+	     $aggInsertableValues=$object_id
+	  }
+  ###  insert new collection #####
+  if ($state eq 'new') {
+  # handle serialized object insertion
+  my $sth = $dbh->prepare(qq/insert into $Class::AutoDB::Registry::OBJECT_TABLE values('$object_id',?)/);
+	$sth->bind_param(1,$freeze);
+	$sth->execute;
+  # handle top-level search keys
+  my $sk_insert_statement = qq/insert into $persistable_name($aggCollKeys) values($aggInsertableValues)/;
+  $dbh->do($sk_insert_statement);
+  # handle list search keys (done with lists at compile time only if list is passed in AutoDB constructor)
+  my($list_name,$list_items) = %list;
+  my $lsk_insert_statement = $dbh->prepare(qq/insert into $list_name values('$object_id',?)/);
+  $lsk_insert_statement->bind_param(1,$list{$list_name});
+  $lsk_insert_statement->execute;
   }  
-  
-  my ($aggCollKeys) = join ",", @collKeys;
-  my ($aggCollValues) = join ",", map { DBI::neat($_) } @collValues;
-
-  # filter out our special keys
-  while (my($k,$v) = each %$persistable) {
-  	delete $persistable->{$k} if $k =~ /^__/;
-  }
-
-  # prepare insert string
-  my ($aggInsertableValues) = join ",", map { DBI::neat($_) } values %$persistable;
-  # prepare update string
-  my $aggUpdatableValues;
-  
-  # filter out special keys (begin with "__")
-  my $arg_cnt = (scalar keys %$persistable);
-  while(my($k,$v) = each %$persistable){
-    $arg_cnt--;
-    next if $k eq 'UID'; # never update object's id
-    $aggUpdatableValues .= "$k\=" . DBI::neat($v);
-    $aggUpdatableValues .= ',' if $arg_cnt;
-  }
-
-  if($self->exists) {
-    # INSERT
-    unless($object_id) {
-      my $insert_statement = qq/insert into $class_table(object,$aggCollKeys) values($aggInsertableValues)/;
-      $dbh->do($insert_statement);
-      # UPDATE
-      } else {
-      	  my $update_statement = qq/update $class_table set $aggUpdatableValues where object=$object_id/;
-       	  eval{ $dbh->do($update_statement) } 
-      }
-      # handle lists
-      if(scalar keys %list) {
-       my($listname,$frozen_value) = %list;
-       my $id = $persistable->{UID};
-       my ($sth, $dirty);
-       my $dumper=new Data::Dumper([undef],['thaw'])->Purity(1)->Indent(0);
-       my $freeze=$dumper->Values([$frozen_value])->Dump;
-       $list{$listname} = _freeze($freeze);
-       $lookup->recall($frozen_value) ? $dirty=1 : $lookup->remember($frozen_value);
-       unless($object_id) {
-         # INSERT
-	     eval { $sth = $dbh->prepare(qq/insert into $listname values($id,?)/) };
-       } else {
-           # UPDATE
-	       my @parts = split '_', $listname; # derive the list field name
-	       eval { $sth = $dbh->prepare(qq/update $listname set $parts[2]=? where object=$object_id/) };
-       }
-       $sth->bind_param(1,$freeze);
+  ### update existing collection #####
+  else {
+  	  # handle serialized object update
+    my $sth = $dbh->prepare(qq/update $Class::AutoDB::Registry::OBJECT_TABLE set object=? where id='$object_id'/);
+  	$sth->bind_param(1,$freeze);
+  	$sth->execute;
+	# handle top-level search key updates
+	my $sk_update_statement = qq/replace into $persistable_name($aggCollKeys) values($aggInsertableValues)/;
+	$dbh->do($sk_update_statement);
+    # handle lists - object IDs get inserted on updates (object IDs assignments occur over life of the object)
+    if(scalar keys %list) {
+      my($list_name,$list_items) = %list;
+       my $sth = $dbh->prepare(qq/replace into $list_name values('$object_id',?)/);
+       $sth->bind_param(1,$list_items);
        $sth->execute;
-       if($@){
-	     $dbh->rollback;
-	     $self->throw("write operation on table $class_table failed, pending writes were rolled back");                                                     
-       }
-     }
+    }
   }
 }
 
-# return a globally unique id string
-# insert will require a unique ID. Done here (vs. DB autoincrementing) for portability.
-sub _getUID {
-  return substr($$.(time % rand(time)),1,9);
+# deletes search keys and serialized object from the data store for the passed
+# SmartProxy object. Refering objects are not updated (they are accessable through a referant's instance)!
+# ...but they cannot be accessed through their search keys (see deleteTest.t)
+# This might cause headaches!
+sub del {
+	my ($self,$deletable)=@_;
+	$self->throw("It looks like you are trying to delete a non-AutoDB object") 
+	  unless ref($deletable) eq 'Class::AutoDB::SmartProxy';
+	my $dbh=$self->dbh;
+	my $table=$deletable->{__proxy_for};
+	my $id=$deletable->{__object_id};
+	my $list=$deletable->{__listname};
+	my $listname=$table.'_'.$list;
+	# delete serialized object
+	$dbh->do("delete from $Class::AutoDB::Registry::OBJECT_TABLE where id=$id");
+	# delete top-level search keys
+	$dbh->do("delete from $table where object=$id");
+  # delete list  search keys
+	$dbh->do("delete from $listname where object=$id");
 }
-
-# decorate the obect_id so that we know its an object_id 
-# (versus an integer string) upon reconstitution
-sub _wrap {
-  my $obj = shift;
-  return '%%'. $obj . '%%';
-}
-
-# remove decoration from the  object_id
-sub _unwrap {
-  my $obj = shift;
-  $obj =~ s/\%\%//g;
-  return $obj;
-}
-
-# check if the argument appears to be wrapped
-sub _is_wrapped {
-  my $obj = shift;
-  $obj =~ s/^\%\%\d+\%\%$//;
-  $obj ? return 0 : return 1;
-}
-
-## freeze lists
-sub _freeze {
-  my ($parent,$value)=@_;    
-    # this is a simple assignment
-    unless (ref($value)) {
-      return $value;
-    }
-    # else this is a list assignment
-    # iterate over list items
-    my $list = [];
-    $value = [$value] unless ref($value) eq 'ARRAY';
-    foreach my $member (@$value) {                                                                                               
-      # compare references => deal with each of the build in types                                                                                                                                         
-      if(ref($member) eq ('SCALAR' || 'HASH' || 'CODE' || 'GLOB')) {                                                                                                  
-        push @$list, $member;                                                                                                                    
-      }                                                                                                                      
-      elsif(ref($member)) { # $member is a user-defined object                                                                          
-        unless( $lookup->recall($member) || $member->{'UID'}) {                                                                                
-          $member->{'UID'} = $lookup->remember($member);                                           
-        }                                                                                                   
-        push @$list,$member;                                                                                                 
-      }
-      else { # this is just a simple assignment                                                                                                   
-        push @$list, $member;                                                                                                    
-      }
-    }                                                                                                                         
-    return $list;
-}
-
 
 sub is_query {
   my $answer = $_[0]->session && $_[0] ne $_[0]->session;
@@ -358,13 +327,17 @@ sub is_connected {
   $_[0]->dbh;
 }
 
-
 # flattens refs into a list
 sub _flatten {  
   my @result = 
-  'HASH' eq ref $_[0] ? %{$_[0]} :
-    'ARRAY' eq ref $_[0] ?  @{$_[0]} :
+  'HASH' eq ref($_[0]) ? %{$_[0]} :
+    'ARRAY' eq ref($_[0]) ?  @{$_[0]} :
     @_;
+}
+
+## override built-in ref function
+sub ref {
+  CORE::ref $_[0] eq 'Class::AutoDB::SmartProxy' ? $_[0]->{__proxy_for} : CORE::ref $_[0];
 }
 
 1;
@@ -636,7 +609,7 @@ Next a query is sent to the database and executed.  This is typically
 accomplished by invoking 'find' on a session object.  The resulting
 object (called $cursor in the SYNOPSIS) is called a 'cursor' object.
 A cursor object's main purpose is to enable data access.  (DBI
-afficionados will recgonize that it's possible to 'prepare' a query
+afficionados will recogonize that it's possible to 'prepare' a query
 before executing it. This is done under the covers here.)
 
 Finally data is retrieved.  This is typically accomplished by invoking
@@ -667,14 +640,14 @@ retrieves all Persons whoe name is Joe and sex is male.
 The raw form is specifed by providing a SQL query (as a string) that
 lacks the SELECT phrase, eg,
 
-  $cusror=$autodb->find(qq(FROM Person WHERE name="Joe" AND sex="male"));
+  $cursor=$autodb->find(qq(FROM Person WHERE name="Joe" AND sex="male"));
 
 To use this form, you have to understand the relational database
 schema generated by AutoDB.  This is not portable across
 implementations, It's main value is to write complex queries that
 cannot be represented in the key=>value form.  For example
 
-  $cusror=$autodb->find(qq(FROM Person p, Person friend, Person_friends friends
+  $cursor=$autodb->find(qq(FROM Person p, Person friend, Person_friends friends
                        WHERE p.name="Joe" AND (friend.name="Mary" OR friend.name="Bill")
                        AND friends.person=p));
 

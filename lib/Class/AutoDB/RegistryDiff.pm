@@ -9,21 +9,19 @@ use Class::AutoDB::Collection;
 use Class::AutoDB::CollectionDiff;
 @ISA = qw(Class::AutoClass);
 
-##BEGIN {
-  @AUTO_ATTRIBUTES=qw(baseline other
-		      baseline_only new_collections
-		      equivalent_diffs sub_diffs super_diffs expanded_diffs inconsistent_diffs
-		      );
-  @OTHER_ATTRIBUTES=qw();
-  %SYNONYMS=();
-  Class::AutoClass::declare(__PACKAGE__,\@AUTO_ATTRIBUTES,\%SYNONYMS);
-##}
+@AUTO_ATTRIBUTES=qw(baseline other
+    baseline_only new_collections
+    equivalent_diffs sub_diffs super_diffs expanded_diffs inconsistent_diffs
+    );
+@OTHER_ATTRIBUTES=qw();
+%SYNONYMS=();
+Class::AutoClass::declare(__PACKAGE__,\@AUTO_ATTRIBUTES,\%SYNONYMS);
 
 sub _init_self {
   my($self,$class,$args)=@_;
   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
   my($baseline,$other)=$self->get(qw(baseline other));
-  ($self->warn("RegistryDiff needs two non-empty registries") && return) unless ($baseline and $other);
+  $self->throw("RegistryDiff needs two non-empty registries") unless ($baseline and $other);
   my($baseline_only,$new,$equivalent,$sub,$super,$expanded,$inconsistent);
   my $baseline_collections=$baseline->collections;
   for my $collection (@$baseline_collections) {

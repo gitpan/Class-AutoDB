@@ -3,98 +3,74 @@ package Class::AutoDB::Cursor;
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
 use strict;
 use Class::AutoClass;
+use Data::Dumper; ## only of debugging
 @ISA = qw(Class::AutoClass); # AutoClass must be first!!
 
-  @AUTO_ATTRIBUTES=qw();
+  @AUTO_ATTRIBUTES=qw(args);
   @OTHER_ATTRIBUTES=qw();
   %SYNONYMS=();
   Class::AutoClass::declare(__PACKAGE__);
 
 sub _init_self {
   my($self,$class,$args)=@_;
-  return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this 
-  $self->{objects} = [];
-  $self->_slot($args);
+  return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
+  $self->args($args);
+  $self->_create_flyweight($args);
   return $self;
 }
 
-# reconstitute the blessed hash with its stored data
-sub _slot {
+# reconstitute the blessed hash with its stored data -
+# $data param contains a collection object and, optionally, search keys
+sub _create_flyweight {
   my($self,$data) = @_;
-  unless($data->{search} && $data->{collection}) {
+  my @objects;
+  unless($data->{collection}) {
     $self->throw("Class::AutoDB::Cursor requires a Class::AutoDB::Collection object and your search keys");
   }
-  my (%searchable,$sql,$search_all, $no_match);
+  my (@searchkeys,%searchable,$sql);
   my $collection_name = $data->collection->name;
-  # %searchable holds which keys to query the database against - all keys if only the collection specified
-  if((scalar keys %{$data->search} == 1) && (exists $data->search->{collection})) {
-    $search_all = 1;
-  } else {
-    foreach(keys %{$data->search}) {
-  	  next if $_ eq 'collection';
-  	  unless($data->collection->_keys->{$_}) {
-  	    $self->warn("can't find key named \'$_\' in $collection_name, ignoring it");
-  	    next;
-  	  }
-  	  $searchable{$_} = $data->search->{$_};
+  my $listname;
+  while (my($k,$v)=each %{$data->collection->_keys}) {
+    if ( $v =~ /^list/ ) { $listname=$k; last }
+  }
+  ###
+  ### get all the records that satisfy the query params for the collection
+  ###
+  if(exists $data->{search} && exists $data->search->{collection}) {
+    @searchkeys = keys %{$data->search};
+  }
+  foreach (@searchkeys) {
+	    next if $_ eq 'collection';
+	    unless($data->collection->_keys->{$_}) {
+	      $self->warn("can't find key named \'$_\' in $collection_name, ignoring it");
+	      next;
+	    }
+	    $searchable{$_} = $data->search->{$_};
+  }
+  $sql = "SELECT * FROM $collection_name";
+  my $arg_cnt = (scalar keys %searchable);
+  
+  # AND together the query attributes
+  if(scalar keys %searchable) {
+    $sql .= " WHERE ";
+    while(my($k,$v) = each %searchable) {
+      $arg_cnt--;
+      $sql .= " $k = \'$v\' ";
+      $sql .= " AND " if $arg_cnt;
     }
   }
-
-    $sql = "SELECT * FROM $collection_name";
-    my $arg_cnt = (scalar keys %searchable);
-    
-    # AND together the query attributes
-    unless($search_all) {
-      $sql .= " WHERE ";
-      while(my($k,$v) = each %searchable) {
-        $arg_cnt--;
-        $sql .= " $k = \'$v\' ";
-        $sql .= " AND " if $arg_cnt;
-      }
-    }
-    my $ary_ref;
-    eval{ $ary_ref = $data->{dbh}->selectall_arrayref($sql) };
-    $self->warn("Query: <$sql> produced no results") unless $ary_ref;
-	
-    # reconstitution
-    foreach(@$ary_ref){
-      #populate attribute through autoargs method
-      my $cnt = 1;
-      # re-bless as class of package collection_name
-      my $obj = _rebless($collection_name);
-      while(my($k,$v) = each %{$data->collection->_keys}) {
-      	# user just asked for the collection - give them everything
-      	if($search_all){
-      	  # handle lists
-      	  if($v =~ m|list\(\w+\)|){ 
-      	  	my $list_ref = $data->{dbh}->selectrow_hashref(_fetch_statement($collection_name, $_->[0], $k));
-      	  	my $thaw;			# variable used in frozen list
-      	  	eval $list_ref->{$k};		# sets $thaw
-      	  	$obj->$k($thaw) || next;
-      	  } else {
-             $obj->$k($_->[$cnt++]);
-      	  }
-      	# otherwise user wants only the requested keys - user gets undef iff all search keys not found
-      	} else {
-      	    # handle lists
-      	    if($v =~ m|list\(\w+\)| && $searchable{$k}){
-      	  	  my $list_ref = $data->{dbh}->selectrow_hashref(_fetch_statement($collection_name, $_->[0], $k ));
-      	  	  my $thaw;			# variable used in frozen list
-              eval $list_ref->{$k};		# sets $thaw
-      	  	  $obj->$k($thaw);
-      	    } else {
-                $obj->$k($searchable{$k}) if $searchable{$k};
-      	    }
-      	}
-      	  # record the object's id so we can update it
-          $obj->{__object_id}=$_->[0];
-          # this is not a new object
-          delete $obj->{UID};
-      }
-      # this is a proxy of the object, so we say so
-      $obj->{__proxyobj}=1;
-      push @{$self->{objects}}, $obj;
-    }
+  my $ary_ref;
+  eval{ $ary_ref = $data->{dbh}->selectall_arrayref($sql) };
+  $self->warn("Query: <$sql> produced no results") unless $ary_ref;
+  ###
+  ### reconstitution - record the object's id and origination class so we can update it
+  ### 
+	foreach(@$ary_ref){
+    my $obj = Class::AutoDB::SmartProxy->new(collection_name=>$collection_name, __object_id=>$_->[0], __listname=>$listname);
+    push @objects, $obj;
+  }
+  $self->{__count} = scalar @$ary_ref;
+  $self->{objects} =  \@objects;
 }
 
 # prepare SQL statement for fetching. If list argument is passed, statement
@@ -109,20 +85,42 @@ sub _fetch_statement {
   }
   return "SELECT * FROM $table_name WHERE object = $id";	
 }
-
-#bless a {} and return it
-sub _rebless {
-  my $collection = shift;
-  return bless {}, $collection;
+# return the number of objects in the retrieved collection
+sub count {
+  my $self=shift;
+  $self->reset;
+  return defined $self->{objects} ? scalar @{$self->{objects}} : 0;
 }
 
+# grab all the elements of the retrieved collection
 sub get {
   my $self = shift;
   return @{$self->{objects}};
 }
 
-# iterates over stored objects
+# get_next: iterator for returned collections
 sub get_next {
+  my $self=shift;
+  my $next=sub{ return --$self->{__count} };
+  my $this=$next->();
+  if( $this == -1 ) { 
+    $self->{__count}=0;
+    return undef;
+  } else {
+    return $self->{objects}->[$this];
+  }
+}
+
+# reset Cursor's object count
+# called explicitly to reset the iterator
+sub reset {
+  my $self=shift;
+  my $cur_count=$self->{__count}; # remember iterator position
+  $self->_create_flyweight($self->args);
+}
+
+# applies the passed subroutine reference to stored objects
+sub traverse {
 	my $self = shift;
 	$self->throw("not implemented");
 }
@@ -202,31 +200,6 @@ The rest of the documentation describes the methods.
            -collection
  Notes   : see CursorTest.t for working examples
            
-
-=head2 _fetch_Statement
- Usage   : Class::AutoDB::Cursor::_fetch_statement("CollectionName", "ID", "ListName");
- Function: generates sql SELECT statement for scalar, list selects
- Returns : String
- Args    : Collection name, a unique identifier, [list name]
- Notes   : see CursorTest.t for working examples
- 
-=head2 _rebless
- Usage   : Class::AutoDB::Cursor::_rebless("saint");
- Function: blesses an ananymous hash into passed argument
- Returns : Object
- Args    : String, name of class to be blessed into
- Notes   : see CursorTest.t for working examples
-
-=head2 _slot
- Usage   : $cursor->_slot($args);
- Function: Reconstitute the blessed hash with its stored data
- Returns : an arrayref of proxied objects (objects that have been reblessed as new and marked)
- Args    : Class::AutoClass::Args instance containing the following arguments:
-           -search
-           -DBI::dbh
-           -collection
- Notes   : see CursorTest.t for working examples
- 
 =head2 get
  Usage   : $cursor->get;
  Function: Retrieves persisted collections

@@ -5,12 +5,11 @@ use strict;
 use Class::AutoClass;
 @ISA = qw(Class::AutoClass); # AutoClass must be first!!
 
-##BEGIN {
   @AUTO_ATTRIBUTES=qw(class _collection _keys _skip _auto_get);
   @OTHER_ATTRIBUTES=qw(collection collections keys skip auto_get);
   %SYNONYMS=();
   Class::AutoClass::declare(__PACKAGE__);
-##}
+
 sub _init_self {
   my($self,$class,$args)=@_;
   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
@@ -66,7 +65,7 @@ sub auto_get {
   ($result && wantarray)? @$result: $result;
 }
 
-sub _flatten {map {'ARRAY' eq ref $_? _flatten(@$_): $_} @_;}
+sub _flatten {map {'ARRAY' eq ref($_) ? _flatten(@$_): $_} @_;}
   
 1;
 

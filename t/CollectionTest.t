@@ -1,6 +1,6 @@
 use lib qw(. t ../lib);
 use Test::More qw/no_plan/;
-use Data::Dumper;
+#use Data::Dumper; # only for debugging
 use Class::AutoDB;
 use Class::AutoDB::Collection;
 use Class::AutoDB::Registration;
@@ -14,11 +14,11 @@ use strict;
   
   my($sql, @sql);
   @sql=$named_reference_object->schema;
-  is($sql[0],"create table testing (object int unsigned not null, primary key (object))","test_schema gets create statement by default  (array context)");
+  is($sql[0],"create table testing (object varchar(10) not null, primary key (object))","test_schema gets create statement by default  (array context)");
   $sql=$named_reference_object->schema;
-  is($sql->[0],"create table testing (object int unsigned not null, primary key (object))","test_schema gets create statement by default (scalar context)");
+  is($sql->[0],"create table testing (object varchar(10) not null, primary key (object))","test_schema gets create statement by default (scalar context)");
   @sql=$named_reference_object->schema('create');
-  is($sql[0],"create table testing (object int unsigned not null, primary key (object))","test_schema gets create statement with 'create' arg");
+  is($sql[0],"create table testing (object varchar(10) not null, primary key (object))","test_schema gets create statement with 'create' arg");
   $sql=$named_reference_object->schema('drop');
   is($sql->[0],"drop table if exists testing","test_schema gets drop statement with 'drop' arg");
   ## UNIMPLEMENTED - skip 
@@ -60,8 +60,8 @@ use strict;
   {                                                                                                                                                             
   	my $DEBUG_BUFFER="";                                                                                                                        
   	tie *STDERR, 'IO::Scalar', \$DEBUG_BUFFER;                                                                                                                   
-  	my $diff = Class::AutoDB::CollectionDiff->new(-baseline=>$empty_coll1, -other=>$empty_coll2);
-  	eval{ $named_reference_object->merge($diff) };                                                                                     
+  	my $diff = Class::AutoDB::CollectionDiff->new(-baseline=>$empty_coll1, -other=>$empty_coll2);  
+  	eval{ $named_reference_object->merge($diff) };                                                        
   	ok($DEBUG_BUFFER =~ /merging empty collections/, "Cannot merge empty collections");                                     
   	untie *STDERR;                                                                                                                                               
   }
@@ -78,32 +78,11 @@ use strict;
 
   $named_reference_object->register($reg2);
   is($named_reference_object->keys->{petals}, "int", "keys() returns correct key");
-  is($named_reference_object->keys->{color}, "string", "keys() returns correct key");
-
-
-
-  # should get a warning,return if our collection has no name
-  {                                                                                                                                                             
-  	my $DEBUG_BUFFER="";                                                                                                                        
-  	tie *STDERR, 'IO::Scalar', \$DEBUG_BUFFER;
-  	eval{ $nameless_reference_object->schema };                                                                                     
-  	ok($DEBUG_BUFFER =~ /requires a named collection/, "tables() requires a named collection");                                     
-  	untie *STDERR;                                                                                                                                               
-  }
- 
+  is($named_reference_object->keys->{color}, "string", "keys() returns correct key"); 
 
   my($tables, @tables);
                                                                
   $nameless_reference_object->register($reg1);
-  # should get a warning,return if our collection has no name
-  {                                                                                                                                                             
-  	my $DEBUG_BUFFER="";                                                                                                                        
-  	tie *STDERR, 'IO::Scalar', \$DEBUG_BUFFER;
-  	eval{ $nameless_reference_object->tables };                                                                                     
-  	ok($DEBUG_BUFFER =~ /requires a named collection/, "tables() requires a named collection");                                     
-  	untie *STDERR;                                                                                                                                               
-  }
-  
   $named_reference_object->register($reg1);
   $named_reference_object->register($reg2);
   

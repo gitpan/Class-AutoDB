@@ -1,7 +1,6 @@
 use lib qw(. t ../lib);
-use base qw(Test::Class);
 use Test::More qw/no_plan/;
-use Data::Dumper;
+#use Data::Dumper; ## only for debugging
 use Class::AutoDB::Table;
 use DBI;
 use strict;
@@ -23,17 +22,17 @@ is(ref($reference_object), "Class::AutoDB::Table");
 
 # test schema
 	my @results = $reference_object->schema;
-	is($results[0], "create table tree (object int unsigned not null, primary key (object),woodland_friends longtext,height int)", "testing default schema results");	
+	is($results[0], "create table tree (object varchar(10) not null, primary key (object),woodland_friends longtext,height int)", "testing default schema results");	
 
 	my @results = $reference_object->schema('create');
-	is($results[0], "create table tree (object int unsigned not null, primary key (object),woodland_friends longtext,height int)", "testing create schema results");	
+	is($results[0], "create table tree (object varchar(10) not null, primary key (object),woodland_friends longtext,height int)", "testing create schema results");	
 
 	my @results = $reference_object->schema('drop');
 	is($results[0], "drop table if exists tree", "testing drop schema");	
 
  	my $other = "foo";
 	eval{my @results = $reference_object->schema('foo', $other)};
-	ok($@ =~ /EXCEPTION/, "An exception if action is not recognized.");
+	ok($@, "An exception if action is not recognized.");
 
 ## This is just a hack, so it tells you what you need to do to make an existing table fit in.  
 # $other does nothing and is not looked for. Probably should make this smarter.

@@ -39,7 +39,7 @@ sub schema {
   my $name=$self->name;
   my $keys=$self->keys;
   $code eq 'create' and do {
-    my @columns=('object int unsigned not null, primary key (object)');
+    my @columns=('object varchar(10) not null, primary key (object)');
     while(my($key,$type)=each %$keys) {
       my $sql_type=$TYPES{$TYPES_ABBREV{$type}} or
 	$self->throw("Invalid data type for key $key: $type. Should be one of: ".join(' ',@TYPES));

@@ -8,7 +8,6 @@ use DBI;
 use Class::AutoClass;
 @ISA = qw(Class::AutoClass);
 
-
 ###############################################################################
 # _mark_noconnect
 #
@@ -139,7 +138,6 @@ sub getDBUser {
     $DB_USER;
 }
 
-
 END  {
 	   if(&can_connect){
          my $dbh = DBI->connect("$DB_DRIVER", "$DB_USER", "$DB_PASS")
@@ -150,7 +148,7 @@ END  {
 	   else{ 	   	  
 	   	     unlink $noConnectionFile;
 	   }
-     }
+}
      
 
 1;

@@ -6,27 +6,26 @@ use Class::AutoClass;
 use Class::AutoClass::Args;
 use Class::AutoDB::Registration;
 use Class::AutoDB::Collection;
+use Class::AutoDB::WeakCache;
 @ISA = qw(Class::AutoClass);
 
-  @AUTO_ATTRIBUTES=qw(autodb oid object_table name2coll _exists);
-  @OTHER_ATTRIBUTES=qw();
-  %SYNONYMS=();
-  Class::AutoClass::declare(__PACKAGE__,\@AUTO_ATTRIBUTES,\%SYNONYMS);
+@AUTO_ATTRIBUTES=qw(autodb oid object_table name2coll _exists);
+@OTHER_ATTRIBUTES=qw();
+%SYNONYMS=();
+Class::AutoClass::declare(__PACKAGE__,\@AUTO_ATTRIBUTES,\%SYNONYMS);
 
 use vars qw($REGISTRY $REGISTRY_OID $OBJECT_TABLE $OBJECT_COLUMNS);
-$REGISTRY_OID=1;		# object id for registry
+$REGISTRY_OID='Registry';		# object id for registry
 $OBJECT_TABLE='_AutoDB';	# default for Object table
-$OBJECT_COLUMNS=qq(id int not null auto_increment, primary key (id), object longblob);
+$OBJECT_COLUMNS=qq(id varchar(15) not null, primary key (id), object longblob);
+# global static reference to weak cache
+my $wc = Class::AutoDB::WeakCache->instance();
 
 sub _init_self {
   my($self,$class,$args)=@_;
   $self->_exists(0);
   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
   $self->object_table || $self->object_table($OBJECT_TABLE);
-  if($args->autodb){
-  	$self->autodb($args->autodb);
-  	$args->get;
-  }
 }
 sub register {
   my $self=shift;
@@ -34,7 +33,7 @@ sub register {
   my $name2coll=$self->name2coll || $self->name2coll({});
   my @collections=$registration->collections;
   for my $name (@collections) {
-    my $collection=$name2coll->{$name} || 
+    my $collection=$name2coll->{$name} ||
       ($name2coll->{$name}=new Class::AutoDB::Collection(-name=>$name));
     $collection->register($registration);
   }
@@ -68,37 +67,28 @@ sub merge {
 }
 # checks if registry is in db
 sub exists {
-  my ($self)=@_;
-  my $autodb = $self->autodb;
-  return 0 unless $autodb && $autodb->is_connected;
-  return $self->_exists if ( defined $self->_exists && $self->_exists);
-  my $dbh=$autodb->dbh;
+  my ($self,$dbh)=@_;
+  $self->throw('requires a database handle') unless $dbh;
   my $object_table=$self->object_table;
   my $tables=$dbh->selectall_arrayref(qq(show tables));
-  my $exists=grep {lc($object_table) eq $_->[0]} @$tables;
+  my $exists=grep {lc($object_table) eq lc($_->[0])} @$tables;
   $self->_exists($exists||0);
 }
-
 # prepare registry for insertion
 sub create {
   my $self=shift;
   my @collections=_flatten(@_);
-  my $autodb=$self->autodb;
-  $self->throw("Cannot create registry or collections without a connected database") unless $autodb && $autodb->is_connected;
-  my $dbh=$autodb->dbh;
-  if (!@collections || $self->name2coll) {		# create entire registry
-    $self->drop if $self->exists;
-    # create object table
-    my $object_table=$self->object_table;
-    my $sql="create table $object_table\($OBJECT_COLUMNS\)";
-    $dbh->do($sql);
-    $self->put;
-    $self->_exists(1);
-    @collections=$self->collections;
-  } else {
-    $self->throw("Cannot create collections unless the registry already exists") if !$self->exists;
-    $self->drop(@collections);	# drop existing tables
-  }
+  $self->autodb($wc->recall('Class::AutoDB'));
+  $self->throw("Cannot create registry or collections without a connected database") unless $self->autodb->is_connected;
+  my $dbh=$self->autodb->dbh;
+  $self->drop if $self->_exists;
+  # create object table
+  my $object_table=$self->object_table;
+  my $sql="create table $object_table\($OBJECT_COLUMNS\)";
+  $dbh->do($sql);
+  $self->put;
+  $self->_exists(1);
+  @collections=$self->collections;
   my @sql=map {$_->schema('create')} @collections;
   for my $sql (@sql) {
     $dbh->do($sql);
@@ -152,19 +142,29 @@ sub do_sql {
   }
 }
 
+## TODO: fetch and get are the crapiest possible names for these methods - maybe they should
+## be named something more descriptive and aliased for user ease
+# returns stored registry
+sub fetch {
+  my ($self,$dbh)=@_;
+  $self->throw('requires a database handle') unless $dbh;
+  return unless $self->_exists;
+  my $registry=$dbh->selectall_arrayref(qq(select * from $OBJECT_TABLE where id='$REGISTRY_OID'));
+	my $thaw;
+  eval $registry->[0][1]; # sets thaw
+  return bless $thaw, __PACKAGE__; # just in case
+}
+# returns stored collections
 sub get {
-  my $self=shift;
-  my $args=new Class::AutoClass::Args(@_);
-  my $autodb=$self->autodb;
-  $self->throw("Cannot open registry without a connected database") unless $autodb && $autodb->is_connected;
-  my $dbh=$autodb->dbh;
-  if ($self->exists) {		# get from database if it exists
+  my ($self,$dbh)=@_;
+  $dbh=$self->autodb->dbh unless $dbh;
+  $self->throw('requires a database handle') unless $dbh;
+  if ($self->_exists) {		# get from database if it exists
     my $object_table=$self->object_table;
     my($freeze)=$dbh->selectrow_array
-      (qq(select object from $object_table where id=$REGISTRY_OID));
-    my $thaw;			# variable used in $DUMPER
+      (qq(select object from $object_table where id="$REGISTRY_OID"));
+    my $thaw;
     eval $freeze;		# sets $thaw
-    @$self{keys %$thaw}=values %$thaw; # copy from saved registry to self
     wantarray ? values %{$thaw->{name2coll}} : [values %{$thaw->{name2coll}}];
   }
 }
@@ -187,15 +187,21 @@ sub put {
 
    ## TODO: flow is icky. create makes collection table and calls put, so
    ## that $self->exists is true while $self->_exists if false
-   my $sth= $self->_exists ?
-     $dbh->prepare(qq(update $object_table set object=? where id=$REGISTRY_OID)) :
-       $dbh->prepare (qq(insert into $object_table(id, object) values($REGISTRY_OID,?)));
+   my $sth;
+   eval {$sth= $self->_exists ?
+     $dbh->prepare(qq(update $object_table set object=? where id="$REGISTRY_OID")) :
+       $dbh->prepare (qq(insert into $object_table(id, object) values("$REGISTRY_OID",?)))};
    $sth->bind_param(1,$freeze);
    $sth->execute;
+   if($@){
+    $dbh->rollback;
+    $self->throw("write operation on table $object_table failed, pending writes were rolled back");                                           
+  }  
+  $self->_exists(1); 
 }
 
 sub _flatten { 
-  map {'ARRAY' eq ref $_? @$_: $_} @_; 
+  map {'ARRAY' eq ref($_) ? @$_: $_} @_; 
 }
 
 1;

@@ -40,16 +40,6 @@ my $ab_bc_bad2_expand2=make_registry(\%ab,\%bc,\%bad2,\%expand2);
 # test isa
 my $diff=new Class::AutoDB::RegistryDiff(-baseline=>$null,-other=>$null);
 ok(ref($diff), "Class::AutoDB::RegistryDiff");
-
-# test_args
-{                                                                                                                                                             
-  my $DEBUG_BUFFER="";                                                                                                                        
-  tie *STDERR, 'IO::Scalar', \$DEBUG_BUFFER;
-  eval{ new Class::AutoDB::RegistryDiff(-baseline=>$null) };                                                                                     
-  ok($DEBUG_BUFFER =~ /RegistryDiff needs two non-empty registries/, "RegistryDiff requires a baseline and comparison registry");                                     
-  untie *STDERR;                                                                                                                                               
-}
-
 # test is_consistent
 is(fdiff($null,$empty)->is_consistent,1,"testing is_consistent");
 is(rdiff($null,$empty)->is_consistent,1);

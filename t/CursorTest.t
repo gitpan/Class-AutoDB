@@ -1,95 +1,66 @@
 use lib qw(. t ../lib);
 use strict;
-use TestAutoDB_3;
+use TestAutoDB_1;
 use DBConnector;
 use Class::AutoDB;
 use Class::AutoClass::Args;
 use Class::AutoDB::Cursor;
 use Test::More qw/no_plan/;
 
-my($cursor, $autodb);
 my $DBC = new DBConnector;
 my $dbh = $DBC->getDBHandle;
-
 
 SKIP: {
         skip "! Cannot test without a database connection - please adjust DBConnector.pm's connection parameters and \'make test\' again", 1 unless $DBC->can_connect;
 
-
-
-
 my $autodb = Class::AutoDB->new(
+                          -dsn=>"DBI:$DBConnector::DB_NAME:database=$DBConnector::DB_DATABASE;host=$DBConnector::DB_SERVER",
+                          -user=>$DBConnector::DB_USER,
+                          -password=>$DBConnector::DB_PASS
+                        ); 
+
+# populate the collection
+for (1..10) {
+  TestAutoDB_1->new(-this=>$_, -that=>'thingy'.$_);
+}
+   
+# grab the whole collection
+my $cursor = $autodb->find(-collection=>'TestAutoDB_1');
+is(ref($cursor), "Class::AutoDB::Cursor", "calling find() as a method on an AutoDB object returns a Cursor object");
+is(scalar $cursor->get,10, "10 collections are currently registered");
+
+# test the Cursor's count
+is($cursor->count,10);
+
+# grab a subset (target) from the collection
+$cursor = $autodb->find(-collection=>'TestAutoDB_1', -that=>'thingy5');
+is($cursor->count,1, "one collection matches the query");
+my ($thingy5)=$cursor->get;
+is(ref($cursor), "Class::AutoDB::Cursor");
+is($thingy5->that,'thingy5');
+
+
+
+# get_next: iterator for retruned collections
+for (4..6) {
+  TestAutoDB_1->new(-this=>$_, -that=>'things',-other=>['other_things']);
+}
+my $cursor=$autodb->find(-collection=>'TestAutoDB_1',-that=>'things');
+is($cursor->get_next->this, 6);
+is($cursor->get_next->this, 5);
+is($cursor->get_next->this, 4);
+is($cursor->get_next, undef);
+
+
+#test Cursor object creation (through autodb creation)
+my $cursor = Class::AutoDB->new(
                             -dsn=>"DBI:$DBConnector::DB_NAME:database=$DBConnector::DB_DATABASE;host=$DBConnector::DB_SERVER",
                             -user=>$DBConnector::DB_USER,
                             -password=>$DBConnector::DB_PASS,
+                            -find=>{-collection=>'TestAutoDB_1'}
                           );
 
-### test object creation (overtly test with calling params)
-my $data = {
-                 'search' => {
-                               'collection' => 'testautodb_3'
-                             },
-                 'dbh' => $dbh,
-                 'collection' => bless( {
-                                          '_tables' => undef,
-                                          'name' => 'testautodb_3',
-                                          '__persist' => 1,
-                                          '_keys' => {
-                                                       'other' => 'list(string)',
-                                                       'that' => 'string',
-                                                       'this' => 'int'
-                                                     }
-                                        }, 'Class::AutoDB::Collection' )
-               };
-               
-$data = bless $data, "Class::AutoClass::Args";
-my $cursor = Class::AutoDB::Cursor->new($data);
-is(ref($cursor), "Class::AutoDB::Cursor", "calling cursor() with the expected params");
-
-### test Cursor object creation (through autodb creation)
-## NOT YET IMPLEMENTED
-#$cursor = Class::AutoDB->new(
-#                            -dsn=>"DBC:$DBConnector::DB_NAME:database=$DBConnector::DB_DATABASE;host=$DBConnector::DB_SERVER",
-#                            -user=>$DBConnector::DB_USER,
-#                            -password=>$DBConnector::DB_PASS,
-#                            -find=>{-collection=>'TestAutoDB_3'}
-#                          );
-#
-#is(ref($cursor), "Class::AutoDB::Cursor", "calling find() in AutoDB constructor returns a Cursor object");
-
-### test find() as a method on cursor obj
-$cursor = $autodb->find(-collection=>'TestAutoDB_3');
-is(ref($cursor), "Class::AutoDB::Cursor", "calling find() as a method on an AutoDB object returns a Cursor object");
-
-### test Cursor functions/methods
-# _fetch_statement
-my $sql = Class::AutoDB::Cursor::_fetch_statement("CollectionName", "ID");
-is($sql,'SELECT * FROM CollectionName WHERE object = ID',"_fetch_statement creates SQL without list");
-my $sql = Class::AutoDB::Cursor::_fetch_statement("CollectionName", "ID", "ListName");
-is($sql,'SELECT * FROM CollectionName_ListName WHERE object = ID', "_fetch_statement creates SQL with list");
-
-# _rebless
-is(ref(Class::AutoDB::Cursor::_rebless("saint")), 'saint');
-
-# _slot
-# most of _slot's functionality is tested through the high-level integration tests, since database
-# connectitivty and collection writing and updating is necessary
-
-# _get
-is($cursor->get,0, "no collections are currently registered");
-
-
-{
-# populate the collection
-my $thingy = TestAutoDB_3->new(-this=>1, -that=>'thingy1', -other=>["one","two"]);
-&Class::AutoClass::DESTROY($thingy);
-}
-$cursor = $autodb->find(-collection=>'testautodb_3');
-#is(ref($cursor), "Class::AutoDB::Cursor", "calling find() as a method on an AutoDB object returns a Cursor object");
-is($cursor->get,1, "one collection is currently registered");
-
-
-# _get_next
-# not yet implemented
+is(ref($cursor), "Class::AutoDB::Cursor", "calling find() in AutoDB constructor returns a Cursor object");
+is(scalar $cursor->get,13, "one collection matches the query");
 };
 

@@ -7,17 +7,12 @@ use Class::AutoClass;
 @ISA=qw(Class::AutoClass);
 use DBConnector;
 
-BEGIN {
   @AUTO_ATTRIBUTES=qw(name sex friends);
   @OTHER_ATTRIBUTES=qw();
   %SYNONYMS=();
   %AUTODB=(-collection=>__PACKAGE__,
-	   -keys=>qq(name string, sex string, friends list(string)),
-	   	   -dsn=>"DBI:$DBConnector::DB_NAME:database=$DBConnector::DB_DATABASE;host=$DBConnector::DB_SERVER",
-           -user=>$DBConnector::DB_USER,
-           -password=>$DBConnector::DB_PASS
+	   -keys=>qq(name string, sex string, friends list(string))
 	  );
   Class::AutoClass::declare(__PACKAGE__);
-}
 
 1;
