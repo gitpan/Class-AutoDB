@@ -6,7 +6,6 @@ use Class::AutoClass;
 use Class::AutoDB;
 @ISA=qw(Class::AutoClass);
 
-BEGIN {
   @AUTO_ATTRIBUTES=qw(this that other);
   @OTHER_ATTRIBUTES=qw();
   %SYNONYMS=();
@@ -14,6 +13,5 @@ BEGIN {
 	       -keys=>qq(this int, that string, other list(string)),
 	      );
   Class::AutoClass::declare(__PACKAGE__);
-}
 
 1;

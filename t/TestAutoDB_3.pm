@@ -8,7 +8,6 @@ use DBConnector;
 
 @ISA=qw(Class::AutoClass);
 
-BEGIN {
   @AUTO_ATTRIBUTES=qw(this that other);
   @OTHER_ATTRIBUTES=qw();
   %SYNONYMS=();
@@ -19,6 +18,5 @@ BEGIN {
            -password=>$DBConnector::DB_PASS
 	      );
   Class::AutoClass::declare(__PACKAGE__);
-}
 
 1;

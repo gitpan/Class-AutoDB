@@ -17,7 +17,6 @@ t/TableTest.t
 t/testAutoCreateConnectionParamsInConstructor.t
 t/testAutoCreateWithConnectionParams.t
 t/TestAutoDB_1.pm
-t/TestAutoDB_1_alter.pm
 t/TestAutoDB_2.pm
 t/TestAutoDB_3.pm
 t/TestAutoDB_4.pm

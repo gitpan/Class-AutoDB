@@ -71,15 +71,15 @@ __END__
 
 =head1 NAME
 
-Bio::ISB::AutoDB::Table - schema information for one table
+Class::AutoDB::Table - schema information for one table
 
 =head1 SYNOPSIS
 
-This is a helper class for Bio::ISB::AutoDB::Registration which
+This is a helper class for Class::AutoDB::Registration which
 represents the schema information for one table
 
-  use Bio::ISB::AutoDB::Table;
-  my $table=new Bio::ISB::AutoDB::Table(
+  use Class::AutoDB::Table;
+  my $table=new Class::AutoDB::Table(
                -name=>'Person',
                -keys=>{name=>string,sex=>string});
   my $name=$table->name; 
@@ -138,11 +138,11 @@ The rest of the documentation describes the methods.
 
  Title   : new
 
- Usage   : $table=new Bio::ISB::AutoDB::Table(
+ Usage   : $table=new Class::AutoDB::Table(
                -name=>'Person',
                -keys=>{name=>string,sex=>string});
  Function: Create object
- Returns : New Bio::ISB::AutoDB::Table object
+ Returns : New Class::AutoDB::Table object
  Args    : -name	name of table being registered
            -keys	key=>type pairs. Each becomes a column of table
 
