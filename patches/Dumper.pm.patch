@@ -1,0 +1,7 @@
+398c397,400
+<       $out .= '->' . $s->{toaster} . '()'  if $s->{toaster} ne '';
+---
+>       my $toaster = $s->{toaster};
+>       if (UNIVERSAL::can($val, $toaster)){
+>         $out .= '->' . $s->{toaster} . '()'  if $s->{toaster} ne '';
+>       }

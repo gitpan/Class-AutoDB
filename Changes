@@ -11,7 +11,9 @@ Revision history
 0.05  17 May 2004
 	- refactor of reconstitution code
 0.06  Mon Aug 16 14:24:43 PDT 2004
-        - major refactor of persistence handling. Store() method added to store objects explicitly (implicit 
+        - major refactor of persistence handling. store() method added to store objects explicitly (implicit 
           storage still occurs when an object is destroyed. Implicitly destroyed objects will not overwrite 
           explicitly destroyed ones). Mosts tests have been re-written and new ones have been added to test
           this storage handling.
+0.07  Tue Aug 17 10:52:27 PDT 2004
+       - require 5.8.2 added for perl version, manifest rebuilt to include patch files 

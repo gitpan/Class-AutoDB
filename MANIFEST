@@ -1,7 +1,5 @@
 Changes
 INSTALL
-MANIFEST			This list of files
-Makefile.PL
 lib/Class/AutoDB.pm
 lib/Class/AutoDB/Cache.pm
 lib/Class/AutoDB/Collection.pm
@@ -15,30 +13,36 @@ lib/Class/AutoDB/SmartProxy.pm
 lib/Class/AutoDB/StoreCache.pm
 lib/Class/AutoDB/Table.pm
 lib/Class/AutoDB/TypeMap.pm
+Makefile.PL
+MANIFEST			This list of files
+META.yml			Module meta-data (added by MakeMaker)
+patches/dd_freeze_thaw.t
+patches/Dumper.pm.patch
+patches/Dumper.xs.patch
+patches/README.patch
+README
 t/CollectionDiffTest.t
 t/CollectionTest.t
 t/CursorTest.t
 t/DBConnector.pm
 t/DeleteCacheTest.t
+t/deleteTest.t
+t/get.pl
+t/iteratorTest.t
+t/performance.t
 t/Person.pm
 t/Place.pm
+t/put.pl
 t/README
 t/RegistrationTest.t
 t/RegistryDiffTest.t
 t/RegistryTest.t
 t/StoreCacheTest.t
 t/TableTest.t
-t/TestAutoDBOutside_1.pm
-t/TestAutoDBOutside_2.pm
 t/TestAutoDB_1.pm
 t/TestAutoDB_2.pm
-t/Thing.pm
-t/TypeMapTest.t
-t/deleteTest.t
-t/get.pl
-t/iteratorTest.t
-t/performance.t
-t/put.pl
+t/TestAutoDBOutside_1.pm
+t/TestAutoDBOutside_2.pm
 t/testConnectionParams_1.t
 t/testConnectionParams_2.t
 t/testStorageStates0.t
@@ -51,5 +55,6 @@ t/testStorageStates4b.t
 t/testStorageStates5.t
 t/testStorageStates6.t
 t/testStoredObject.t
+t/Thing.pm
+t/TypeMapTest.t
 t/zzz.t
-META.yml                                 Module meta-data (added by MakeMaker)

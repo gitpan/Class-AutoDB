@@ -1,5 +1,6 @@
 package Class::AutoDB;
-our $VERSION = '0.06';
+our $VERSION = '0.07';
+require 5.8.2;
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
 use strict;
 use DBI;
