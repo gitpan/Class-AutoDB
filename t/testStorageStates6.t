@@ -84,10 +84,8 @@ SKIP: {
   
   # test persisted object's list
   $dawgs = $dbh->selectall_arrayref("select friends from Person_friends where object=$people{joe}");
-  $list = $dawgs->[0]->[0];
-  eval $list; # sets the $thaw handle from list reference
-  is($thaw->[0], $people{eddy});
-  is($thaw->[2], undef, "outside object not added, as expected");
+  is($dawgs->[0]->[0], $people{eddy});
+  is($dawgs->[2]->[0], undef, "outside object not added, as expected");
   # test persisted object
   ($thaw) = undef;
   my $j_obj = $dbh->selectall_arrayref("select object from _AutoDB where id=$people{joe}");
@@ -107,11 +105,9 @@ SKIP: {
   ok($e->[$_]->[2] eq q[male]);
   # test persisted object's list
   $dawgs = $dbh->selectall_arrayref("select friends from Person_friends where object=$people{eddy}");
-  $list = $dawgs->[0]->[0];
-  eval $list; # sets the $thaw handle from list reference
-  is($thaw->[0], $people{joe});
-  is($thaw->[1], 'string thing', "string is added");
-  is($thaw->[2], undef, "outside object not added, as expected");
+  is($dawgs->[0]->[0], $people{joe});
+  is($dawgs->[1]->[0], 'string thing', "string is added");
+  is($dawgs->[2]->[0], undef, "outside object not added, as expected");
   # test persisted object
   ($thaw) = undef;
   my $b_obj = $dbh->selectall_arrayref("select object from _AutoDB where id=$people{eddy}");

@@ -42,10 +42,8 @@ SKIP: {
   ok($j->[$_]->[1] eq q[Joe]);
   ok($j->[$_]->[2] eq q[male]);
   $dawgs = $dbh->selectall_arrayref("select friends from Person_friends where object=$people{joe}");
-  $list = $dawgs->[0]->[0];
-  eval $list; # sets the $thaw handle from list reference
-  is($thaw->[0], $people{mary});
-  is($thaw->[1], $people{bill});
+  is($dawgs->[0]->[0], $people{mary});
+  is($dawgs->[1]->[0], $people{bill});
   # test persisted object's list
   ($thaw) = undef;
   my $j_obj = $dbh->selectall_arrayref("select object from _AutoDB where id=$people{joe}");
@@ -64,10 +62,8 @@ SKIP: {
   ok($m->[$_]->[1] eq q[Mary]);
   ok($m->[$_]->[2] eq q[female]);
   $dawgs = $dbh->selectall_arrayref("select friends from Person_friends where object=$people{mary}");
-  $list = $dawgs->[0]->[0];
-  eval $list; # sets the $thaw handle from list reference
-  is($thaw->[0], $people{joe});
-  is($thaw->[1], $people{bill});
+  is($dawgs->[0]->[0], $people{joe});
+  is($dawgs->[1]->[0], $people{bill});
   # test persisted object's list
   ($thaw) = undef;
   my $m_obj = $dbh->selectall_arrayref("select object from _AutoDB where id=$people{mary}");
@@ -87,8 +83,8 @@ SKIP: {
   $dawgs = $dbh->selectall_arrayref("select friends from Person_friends where object=$people{bill}");
   $list = $dawgs->[0]->[0];
   eval $list; # sets the $thaw handle from list reference
-  is($thaw->[0], $people{joe});
-  is($thaw->[1], $people{mary});
+  is($dawgs->[0]->[0], $people{joe});
+  is($dawgs->[1]->[0], $people{mary});
   # test persisted object's list
   ($thaw) = undef;
   my $b_obj = $dbh->selectall_arrayref("select object from _AutoDB where id=$people{bill}");

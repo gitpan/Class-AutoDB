@@ -1,5 +1,5 @@
 package Class::AutoDB;
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 require 5.8.2;
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
 use strict;
@@ -13,7 +13,7 @@ use Class::AutoDB::Cursor;
 use Class::AutoDB::SmartProxy;
 use Class::AutoDB::StoreCache;
 use Class::AutoDB::DeleteCache;
-use Data::Dumper; ## only for testing
+
 @ISA=qw(Class::AutoClass);
 
 # global static references to caches
@@ -21,7 +21,7 @@ my $sc = Class::AutoDB::StoreCache->instance();
 my $dc = Class::AutoDB::DeleteCache->instance();
 
 @AUTO_ATTRIBUTES=qw(dsn dbh dbd database host user password 
-		      read_only read_only_schema
+		      read_only read_only_schema _create _drop _alter
 		      object_table registry
 		      session cursors diff
 		      _needs_disconnect _db_cursor );
@@ -31,8 +31,6 @@ Class::AutoClass::declare(__PACKAGE__);
 
 use vars qw($AUTO_REGISTRY $AUTODB);
 $AUTO_REGISTRY=new Class::AutoDB::Registry; # default in-memory registry
-
-my %stuff;
 
 sub auto_register {
   $AUTO_REGISTRY->register(@_);
@@ -50,7 +48,7 @@ sub _init_self {
     return $self->_manage_registry($args);
   } else {
     # create registry if it doesn't already exist (this will happen when find is passed as a constructor param to AutoDB)
-    $self->_manage_registry($args) unless $self->_registry_is_saved;
+    $self->_manage_registry($args);
     my $cursor=$self->_manage_query($args);
     # AutoClass expects to send back an AutoClass object, so we displace it here
     undef %$self;
@@ -68,15 +66,16 @@ sub _manage_registry {
   no warnings;
   my($self,$args)=@_;
   # this should return a session-oriented object
-  $self->session(1) if $self->is_connected;
+  $self->session(1) if $self->is_connected and not $args->find;
   # grab schema modification parameters
-  my $read_only_schema=$self->read_only_schema || $self->read_only;
-  my $drop=$args->drop;
-  my $create=$args->create;
-  my $alter=$args->alter;
-  my $count=($create>0)+($alter>0)+($drop>0);
+  my $ro=$self->read_only_schema || $self->read_only;
+  $ro ? $self->_drop(0) : $self->_drop($args->drop);
+  $ro ? $self->_create(0) : $self->_create($args->create);
+  $ro ? $self->_alter(0) : $self->_alter($args->alter);
+
+  my $count=($self->_create>0)+($self->_alter>0)+($self->_drop>0);
   $self->throw("It is illegal to set more than one of -create, -alter, -drop") if $count>1;
-  $self->throw("Schema changes not allowed by -read_only or -read_only_schema setting") if $count && $read_only_schema;
+  $self->throw("Schema changes not allowed by -read_only or -read_only_schema setting") if $count && $ro;
   # get saved registry and merge with in-memory registry
   my $in_memory=$self->registry;
   my $saved;
@@ -84,44 +83,44 @@ sub _manage_registry {
     $saved=$self->_fetch_registry;
   } else {
     $saved=$AUTO_REGISTRY;
-    $create=1;
+    $self->create(1);
   }
   my $diff=new Class::AutoDB::RegistryDiff(-baseline=>$saved,-other=>$in_memory);
-  unless ($diff->is_sub) {		# in-memory schema adds something to saved schema
+  unless ($diff->is_equivalent) {		# in-memory schema adds something to saved schema
     $self->throw("In-memory and saved registries are inconsistent") unless $diff->is_consistent;
-    $self->throw("In-memory registry adds to saved registry, but schema changes are not allowed by -read_only or -read_only_schema setting") if $read_only_schema;
+    $self->throw("In-memory registry adds to saved registry, but schema changes are not allowed by -read_only or -read_only_schema setting") if $ro;
     unless ($count) {
-      # if no options are set can only make default changes
-      if ($saved->_registry_is_saved) {	
-        $self->throw("In-memory registry adds to saved registry, but schema alteration prevented by -alter=>0") if $alter eq 0;
-        # alter-if--exists case -- can only add collections
-        $self->throw("Some collections are expanded in-memory relative to saved registry.  Must set -alter=>1 to change saved registry") if $diff->has_expanded;
-      } else {
-        $self->throw("Schema does not exist, but schema creation prevented by -create=>0") if $create eq 00;
+      # alter-if-exists case -- can only add collections
+      if(defined $self->_alter and $self->_alter == 0) {
+        $self->throw("Some collections are expanded in-memory relative to saved registry.  Must set -alter=>1 to change saved registry");
+      }
+      elsif (defined $self->_create and $self->_create == 0) {
+        $self->throw("Schema does not exist, but schema creation prevented by -create=>0");
       }
     }
     $saved->merge($diff);
   }
-  $self->registry->_exists(1);
   $self->registry($saved);
+  $self->registry->dbh($self->dbh);
   $self->diff($diff);
+  
   # Now do specified schema operations
-  $self->drop, return if $drop;
-  $self->create, return if $create;
-  $self->alter, return if $alter;
+  $self->drop, return if $self->_drop;
+  $self->create, return if $self->_create;
+  $self->alter, return if $self->_alter;
   
   # Finally, do default schema operations if required
-  unless ($diff->is_sub) { # in-memory schema adds something to saved schema  
-    $self->create, return if (!$saved->_registry_is_saved && $self->is_connected);
-    $self->alter, return if ($saved->_registry_is_saved && $self->is_connected);
+  if ($self->is_connected) { # in-memory schema adds something to saved schema
+    $self->create, return  unless ($self->_create eq 0);
+    $self->alter, return   unless ($self->_alter eq 0);
   }
   return $self;
 }
 sub connect {
   my($self,@args)=@_;
   my $args=new Class::AutoClass::Args(@args);
-  $self->Class::AutoClass::set_attributes([qw(dbh dsn dbd host server user password database)],$args);
-  $self->_connect();
+  $self->set_attributes([qw(dbh dsn dbd host server user password database)],$args);
+  $self->_connect;
 }
 sub _connect {
   my($self)=@_;
@@ -142,22 +141,31 @@ sub _connect {
   my $user = ($self->user || $self->user('root'));
   my $dbh = DBI->connect($dsn,$user,$self->password,
 			 {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, Warn=>0,});
+	$self->throw("undefined database handle: check that the database exists and your connection parameters are valid") 
+	  unless defined $dbh;
   $self->dsn($dsn);
   $self->dbh($dbh);
+  $self->registry->dbh($dbh); # registry requirs db handle
   $self->_needs_disconnect(1);
-  $self->throw("DBI::connect failed for dsn=$dsn, user=$user: ".DBI->errstr) unless $dbh;
+  $self->throw("DBI::connect failed for dsn=$dsn, user=$user: ".DBI->errstr) if $dbh->errstr();
 }
 
 sub create {
   my($self)=@_;
-  my $registry=$self->registry;
-  $registry->create($self->registry->collections);
+  my $collections = $self->registry->collections;
+  if($self->_create){ # force new creation
+    $collections = $self->{diff}->{new_collections};
+    $self->drop;
+    $self->registry(new Class::AutoDB::Registry(-dbh=>$self->dbh)); # reset registry
+    foreach my $collection (@$collections) {
+    	$self->registry->{name2coll}{$collection->{name}} = $collection;
+    }
+  }
+  $self->registry->create($collections);
 }
 sub drop {
   my($self)=shift;
-  my $registry=$self->registry;
-  $registry->drop(@_);
-  $self->registry(new Class::AutoDB::Registry(-autodb=>$self)); # reset registry
+  $self->registry->drop(@_);
 }
 sub alter {
   my($self)=@_;
@@ -176,13 +184,13 @@ sub alter {
 sub _registry_is_saved {
   my $self=shift;
   $self->throw("there is no established database connection") unless $self->is_connected;
-  $self->registry->exists($self->dbh) ? 1 : 0;
+  $self->registry->exists ? 1 : 0;
 }
 
 sub _fetch_registry {
   my $self=shift;
   $self->throw("there is no established database connection") unless $self->is_connected;
-  $self->registry->fetch($self->dbh);
+  $self->registry->fetch;
 }
 
 # returns a Class::AutoDB::Cursor object for objects in the data store which satisfy the query
@@ -191,11 +199,10 @@ sub find {
   my %normalized = _flatten(@query);
   my $args = new Class::AutoClass::Args(%normalized);
   $self->_registry_is_saved || $self->throw("registry was not found in the database");
-  
   if(defined $args->collection) {
     # need to return a cursor obj
     my $cursor;
-    my $collections = $self->registry->get($self->dbh);
+    my $collections = $self->registry->get;
     my $collection_to_find = $args->collection;
     foreach my $collection (@$collections){
       next unless lc($collection->name) eq lc($collection_to_find);
@@ -232,18 +239,18 @@ sub del {
 	# delete top-level search keys
 	$dbh->do("delete from $table where object=$id");
   # delete list search keys
-  my $listname = $deletable->{__listname}; # easy way (might be set in SmartProxy)
-  unless ( $listname ) { # the hard way
+  my $listnames = $deletable->{__listname}; # easy way (might be set in SmartProxy)
+  unless ( $listnames ) { # the hard way
     foreach my $collection ($registry->collections) {
       next unless $collection->name eq $table;
     	while(my($k,$v) = each %{$collection->_keys}) {
         if($v =~ /list\(\w+\)/) {
-    		  $listname = "$table"."_$k";
+    		  push @$listnames, "$table"."_$k";
     	  }
     	}
     }
   }
-  if ( $listname ) {
+  foreach my $listname ( @$listnames ) {
 	  $dbh->do("delete from $listname where object=$id");
 	  # deleted list names are cached for Class::AutoDB::SmartProxy::is_deleted
     $dc->cache($id,1);
@@ -751,6 +758,7 @@ The rest of the documentation describes the methods.
            -dbd        Name of DBD driver. 
                        Default 'mysql' which is also is the only value
                        currently supported
+           -database   Name of database to connect to
            -host       Hostname of database server
            -server     Synonym for -host
            -user       User name valid for database
@@ -803,7 +811,7 @@ The rest of the documentation describes the methods.
            2) If true: database creation is forced. Ie, the database is
               created whether or not it exists.  
            3) If defined but false: database is not created even if it
-              does not exist.  Instead an error is thrown.
+              does not exist.  Instead an error is thrown if alterations are required.
 
            -alter	Controls whether the schema may be altered
 

@@ -7,6 +7,7 @@ use Class::AutoDB::Registration;
 use DBI;
 use IO::Scalar;
 use strict;
+use Data::Dumper; ## only for debugging
 
 use vars qw($REGISTRY $REGISTRY_OID $OBJECT_TABLE $OBJECT_COLUMNS);
 $REGISTRY_OID=1;		# object id for registry
@@ -276,7 +277,7 @@ sub rdiff{
 sub make_registry {
   my $registry=new Class::AutoDB::Registry;
   for my $hash (@_) {
-    $registry->register(%$hash);
+    $registry->register(new Class::AutoClass::Args($hash));
   }
   $registry;
 }

@@ -9,7 +9,7 @@ use TestAutoDB_1;
 use TestAutoDB_2;
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS %AUTODB);
 
-my  $DBC = new DBConnector(noclean=>1);
+my  $DBC = new DBConnector();
 my  $DBH = $DBC->getDBHandle;
 
 SKIP: {

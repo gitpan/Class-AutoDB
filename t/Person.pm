@@ -1,18 +1,18 @@
 package Person;
-
 use strict;
-use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS %AUTODB);
+use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES
+%SYNONYMS %DEFAULTS
+%AUTODB);
 use Class::AutoClass;
-use DBConnector;
+
 @ISA=qw(Class::AutoClass);
 
-@AUTO_ATTRIBUTES=qw(name sex friends);
+@AUTO_ATTRIBUTES=qw(name sex friends alias hobbies);
 @OTHER_ATTRIBUTES=qw();
 %SYNONYMS=();
-%AUTODB=(-collection=>__PACKAGE__,
-	   -keys=>qq(name string, sex string, friends list(mixed)),
-	  );
-
+%AUTODB=(
+-collection=>'Person',
+-keys=>qq(name string, sex string, hobbies list(string), friends list(mixed)));
 Class::AutoClass::declare(__PACKAGE__);
 
 1;

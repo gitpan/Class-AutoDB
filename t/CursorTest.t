@@ -7,8 +7,9 @@ use Class::AutoClass::Args;
 use Class::AutoDB::Cursor;
 use Scalar::Util;
 use Test::More qw/no_plan/;
+use Data::Dumper; # only for testing
 
-my $DBC = new DBConnector;
+my $DBC = new DBConnector();
 my $dbh = $DBC->getDBHandle;
 
 SKIP: {
@@ -18,7 +19,7 @@ SKIP: {
                             -dsn=>"DBI:$DBConnector::DB_NAME:database=$DBConnector::DB_DATABASE;host=$DBConnector::DB_SERVER",
                             -user=>$DBConnector::DB_USER,
                             -password=>$DBConnector::DB_PASS
-                          ); 
+                          );
   
   # populate the collection
   for (1..10) {
@@ -58,7 +59,7 @@ SKIP: {
                               -password=>$DBConnector::DB_PASS,
                               -find=>{-collection=>'TestAutoDB_1'}
                             );
-  
+
   is(ref($cursor2), "Class::AutoDB::Cursor", "calling find() in AutoDB constructor returns a Cursor object");
   is(scalar $cursor2->get,13, "one collection matches the query");
 };

@@ -64,7 +64,7 @@ sub _reconstitute {
   # grab oid from search params
   my $ary_ref;
   eval{ $ary_ref = $data->{dbh}->selectall_arrayref($sql) };
-  $self->warn("Query: <$sql> produced no results") and return unless $ary_ref;
+  $self->warn("Query: <$sql> produced no results") and return unless scalar $ary_ref;
   
   ### reconstitution - create an instance of the stored object
   foreach (@$ary_ref) {
@@ -72,7 +72,7 @@ sub _reconstitute {
     my ($fetched,$thaw);
     $sql = qq/select object from $Class::AutoDB::Registry::OBJECT_TABLE where id=$oid/;
     eval{ $fetched = $data->{dbh}->selectall_arrayref($sql) };
-    $self->warn("Query: <$sql> produced no results") unless $fetched;
+    $self->warn("Query: <$sql> produced no results") and return unless $fetched->[0];
     eval $fetched->[0]->[0]; # sets thaw
     push @objects, bless $thaw, $thaw->{__proxy_for};
   }
@@ -199,14 +199,21 @@ The rest of the documentation describes the methods.
 =head2 get
  Usage   : $cursor->get;
  Function: Retrieves persisted collections
- Returns : an arrayref of proxied objects (objects that have been reblessed as new and marked)
+ Returns : an arrayref of objects
  Args    : None
  Notes   : see CursorTest.t for working examples
  
-=head2 get_next (NOT YET IMPLEMENTED)
- Usage   :
- Function:
+=head2 get_next
+ Usage   : $cursor->get_next;
+ Function: iterator over recalled collections
+ Returns : an object, undef if last object
+ Args    : None
+ Notes   : $cursor->reset to reset iterator pointer. See CursorTest.t for working examples
+ 
+ =head2 reset
+ Usage   : $cursor->reset;
+ Function: reset iterator to point to first object in retrieved collection
  Returns : 
- Args    : 
- Notes   : (see CursorTest.t for working examples)
+ Args    : None
+ Notes   : See CursorTest.t for working examples
 =cut

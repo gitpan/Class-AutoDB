@@ -22,10 +22,10 @@ is(ref($reference_object), "Class::AutoDB::Table");
 
 # test schema
 	my @results = $reference_object->schema;
-	is($results[0], "create table tree (object varchar(10) not null, primary key (object),woodland_friends longtext,height int)", "testing default schema results");	
+	is($results[0], "create table tree (object varchar(15) not null, primary key (object),woodland_friends longtext,height int)", "testing default schema results");	
 
 	@results = $reference_object->schema('create');
-	is($results[0], "create table tree (object varchar(10) not null, primary key (object),woodland_friends longtext,height int)", "testing create schema results");	
+	is($results[0], "create table tree (object varchar(15) not null, primary key (object),woodland_friends longtext,height int)", "testing create schema results");	
 
 	@results = $reference_object->schema('drop');
 	is($results[0], "drop table if exists tree", "testing drop schema");	

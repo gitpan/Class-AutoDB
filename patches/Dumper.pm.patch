@@ -1,7 +1,12 @@
-398c397,400
-<       $out .= '->' . $s->{toaster} . '()'  if $s->{toaster} ne '';
----
->       my $toaster = $s->{toaster};
->       if (UNIVERSAL::can($val, $toaster)){
->         $out .= '->' . $s->{toaster} . '()'  if $s->{toaster} ne '';
->       }
+--- ../Data-Dumper-2.121_orig/Dumper.pm	2003-08-23 22:12:00.000000000 -0700
++++ Dumper.pm	2004-08-20 17:09:09.000000000 -0700
+@@ -395,7 +395,8 @@
+     
+     if ($realpack) { # we have a blessed ref
+       $out .= ', \'' . $realpack . '\'' . ' )';
+-      $out .= '->' . $s->{toaster} . '()'  if $s->{toaster} ne '';
++      $out .= '->' . $s->{toaster} . '()'
++        if $s->{toaster} ne '' and UNIVERSAL::can( $val, $s->{toaster});
+       $s->{apad} = $blesspad;
+     }
+     $s->{level}--;

@@ -52,7 +52,7 @@ sub DUMPER_thaw {
 # return a globally unique id string
 # insert will require a unique ID. Done here (vs. DB autoincrementing) for portability.
 sub _getUID {
-  return '1'.substr($$.(time % rand(time)),1,9); # starting with a zero causes all sorta heartache
+	return  int '1'. substr(rand(time . $$),1,14); # starting with a zero causes all sorta heartache
 }
 
 # store() is only called by the user for explicit writes to the data store.
@@ -74,7 +74,7 @@ sub _persist {
   my $dbh = $adb->{dbh} or return;
   my $persistable_name = $self->{__proxy_for} || $self->throw("Not sure who object is proxying");
   my $oid = $self->{__object_id} || $self->throw("No object ID was associated with this object");
-  my (%collVals, %list, $list_name);
+  my (%collVals, %list);
   return if ( $destroyed and $handler{$oid} and $handler{$oid} eq 'manual' );
   
   # need the frozen object somehow
@@ -84,8 +84,7 @@ sub _persist {
      }
   }
 
-  my $persistable = $self->_unwrap($oid);  
-  my @insertable=();
+  my $persistable = $self->_unwrap($oid);
   
   # filter out all but the searchable keys
   foreach my $collection ($registry->collections) {
@@ -99,12 +98,10 @@ sub _persist {
 		        unless $tm->is_valid($v, $persistable->{$k});
 			    foreach my $item (@{$persistable->{$k}}) {
 		        # if items are scalar, just insert them. If they are SmartProxy objects, insert OIDs
-            push @insertable, ref $item ? $item->{__object_id} : $item;
+            push @{$list{"$persistable_name"."_$k"}}, ref $item ? $item->{__object_id} : $item;
 		      }
-		      $list_name = "$persistable_name"."_$k";
-		      # insert list name into object (delete requires it)
-		      $self->{__listname} = $list_name;
-		      $list{$list_name} = \@insertable;
+		      # insert list names into object (delete requires it)
+		        $self->{__listname} = [keys %list];
 		      # delete from top-level search keys (handled)
 		      delete $persistable->{$k};
 		   # object types will be stored with their oid as value
@@ -155,14 +152,14 @@ sub _persist {
   ### handle top-level search keys
   $dbh->do(qq/replace into $persistable_name($aggInsertCollKeys) values($aggInsertableValues)/);
   # handle list search keys
-  if( scalar keys %list ) {
-    # serialize list
-    $dumper->Reset;
-    my $freeze=$dumper->Values([\@insertable])->Dump;
-    my $skl = $dbh->prepare(qq/replace into $list_name values(?,?)/);
-	  $skl->bind_param(1,$oid);
-	  $skl->bind_param(2,$freeze);
-    $skl->execute;
+  foreach my $list_name ( keys %list ) {
+  	$dbh->do(qq/delete from $list_name where object="$oid"/);
+    foreach my $li (@{$list{$list_name}}) {
+	    my $skl = $dbh->prepare(qq/insert into $list_name values(?,?)/);
+		  $skl->bind_param(1,$oid);
+		  $skl->bind_param(2,$li);
+	    $skl->execute;
+    }
   }
 }
 

@@ -27,7 +27,7 @@ my %CODES=abbrev @CODES;
 my %TYPES=(string  =>'longtext',
 	   integer =>'int',
 	   float   =>'double',
-	   object  =>'int',
+	   object  =>'varchar(15)', # must match Registry's object type
 	   mixed   => 'longtext',);
 my @TYPES=CORE::keys %TYPES;
 my %TYPES_ABBREV=abbrev @TYPES;
@@ -40,12 +40,18 @@ sub schema {
   my $name=$self->name;
   my $keys=$self->keys;
   $code eq 'create' and do {
-    my @columns=('object varchar(10) not null, primary key (object)');
+    my (@columns,$inner_type);
     while(my($key,$type)=each %$keys) {
+    	($inner_type)=$type=~/^list\s*\(\s*(.*?)\s*\)/;
+    	$type = $inner_type || $type; # get list inner type for verification
       my $sql_type=$TYPES{$TYPES_ABBREV{$type}} or
-	$self->throw("Invalid data type for key $key: $type. Should be one of: ".join(' ',@TYPES));
+	      $self->throw("Invalid data type for key $key: $type. Should be one of: ".join(' ',@TYPES));
       push(@columns,"$key $sql_type");
     }
+    # make sure that the object column size >= that of the id in the Registry
+    unshift @columns, $inner_type?
+      ('object varchar(15) not null') :
+      ('object varchar(15) not null, primary key (object)');
     $sql=@columns? "create table $name \(".join(',',@columns)."\)": '';
   };
   $code eq 'drop' and do {
@@ -55,7 +61,7 @@ sub schema {
     my @columns;
     while(my($key,$type)=each %$keys) {
       my $sql_type=$TYPES{$TYPES_ABBREV{$type}} or
-	$self->throw("Invalid data type for key $key: $type. Should be one of: ".join(' ',@TYPES));
+	      $self->throw("Invalid data type for key $key: $type. Should be one of: ".join(' ',@TYPES));
       push(@columns,"add $key $sql_type");
     }
     $sql=@columns? "alter table $name ".join(',',@columns): '';

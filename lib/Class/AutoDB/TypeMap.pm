@@ -175,7 +175,6 @@ sub is_inside {
     1 : 0; 
 }
 
-
 # args will be presented as either an Class::AutoDB::Collection instance
 # or as members of a Class::AutoClass::Args instance.
 # return as an array ref of Collections

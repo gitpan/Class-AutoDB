@@ -8,21 +8,20 @@ use Class::AutoDB;
 use DBConnector;
 use strict;
 use constant MAX=>1000;
-my($DBC, $DBH, $start_time, $log);
+my($start_time, $log);
 
 BEGIN {
  $start_time = time();
 }
 
- $DBC = new DBConnector;
- $DBH = $DBC->getDBHandle;
+ my $dbc = new DBConnector;
+ my $dbh = $dbc->getDBHandle;
+ my $OBJECT_TABLE='_AutoDB';	# default for Object table
 
 SKIP: {
-        skip "! Cannot test without a database connection - please adjust DBConnector.pm's connection parameters and \'make test\' again", 1 unless $DBC->can_connect;
+        skip "! Cannot test without a database connection - please adjust DBConnector.pm's connection parameters and \'make test\' again", 1 unless $dbc->can_connect;
 
-  
-  is(1,1,"testing system performance");
-  $log = "t/.AUTODB_performance";
+  $log = ".AUTODB_performance";
   print "writing performance test to $log\n";
   
   my $autodb =
@@ -36,12 +35,15 @@ SKIP: {
     # create objects in memory and populate the collection
     my $thingy=TestAutoDB_1->new(-this=>1, -that=>'thingy1', -other=>["one","two"]);
   }
+  
+  my $count = $dbh->selectrow_array("select count(*) from $OBJECT_TABLE");
+  is($count,MAX + 1,"testing system performance"); # add one for registry
+  
   my $create_and_store_time = time() - $start_time;
   # this will retrieve MAX collections
   my $cursor = $autodb->find(-collection=>'TestAutoDB_1');
   my $retrieve_time = time() - $start_time - $create_and_store_time;
   
-  #END {
   my $cleanup_time = time() - $start_time - $retrieve_time;
   my $total_time = $create_and_store_time + $retrieve_time + $cleanup_time;
   
@@ -56,5 +58,4 @@ SKIP: {
   print FILE "time elapsed for destroying objects ==> $cleanup_time\n";
   print FILE "total time elapsed ==> $total_time\n";
   print FILE "\n";
-  #}
 }

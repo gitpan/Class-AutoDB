@@ -6,7 +6,6 @@ use Person;
 use Thing;
 use Test::More qw/no_plan/;
 use Scalar::Util;
-use Data::Dumper; ##only for testing
 
 my $DBC = new DBConnector();
 my $dbh = $DBC->getDBHandle;
@@ -24,16 +23,16 @@ SKIP: {
                           
   # populate the collections
   my ($lucy,$ethel,$Pcursor,$Tcursor);
-  $ethel = Person->new(-name=>'Ethel', -sex=>'female',-friends=>[$lucy] ); # will be undef since lucy doesn't exist yet
+  $ethel = Person->new(-name=>'Ethel', -sex=>'female',-friends=>[$lucy],-hobbies=>['keeping Lucy out of trouble'] ); # will be undef since lucy doesn't exist yet
   $ethel->store; # this will be committed to data store immediately
-  $lucy = Person->new(-name=>'Lucy', -sex=>'female',-friends=>[$ethel] );
+  $lucy = Person->new(-name=>'Lucy', -sex=>'female',-friends=>[$ethel],-hobbies=>['getting into trouble'] );
   $lucy->store; # ditto
   
   # create and immediately destroy (so that objects are persisted)
   for (1..3) {
     Scalar::Util::weaken( Thing->new(-name=>"friend$_", -sex=>'female', -friends=>[$lucy,$ethel] ) );
   }
-     
+
   # verify the collections
   $Tcursor = $autodb->find(-collection=>'Thing');
   is($Tcursor->count,3);
@@ -41,14 +40,16 @@ SKIP: {
     is($thing->friends->[0]->name,'Lucy');
     is($thing->friends->[1]->name,'Ethel');
   }
-  
+  my $count = $dbh->selectrow_array('select count(*) from Thing_friends');
+  is($count,6,'friends list checks out in database');
+
   $Pcursor = $autodb->find(-collection=>'Person');
   is($Pcursor->count,2);
+
   # delete the Person entries (Things refer to them)
   while (my $Person = $Pcursor->get_next) {
     $autodb->delete($Person);
   }
-  
   # verify Person deletions
   is($Pcursor->count,0);
   

@@ -15,7 +15,6 @@ lib/Class/AutoDB/Table.pm
 lib/Class/AutoDB/TypeMap.pm
 Makefile.PL
 MANIFEST			This list of files
-META.yml			Module meta-data (added by MakeMaker)
 patches/dd_freeze_thaw.t
 patches/Dumper.pm.patch
 patches/Dumper.xs.patch
@@ -41,6 +40,9 @@ t/StoreCacheTest.t
 t/TableTest.t
 t/TestAutoDB_1.pm
 t/TestAutoDB_2.pm
+t/testAutodbAlter.t
+t/testAutodbCreate.t
+t/testAutodbDrop.t
 t/TestAutoDBOutside_1.pm
 t/TestAutoDBOutside_2.pm
 t/testConnectionParams_1.t
@@ -58,3 +60,4 @@ t/testStoredObject.t
 t/Thing.pm
 t/TypeMapTest.t
 t/zzz.t
+META.yml                                 Module meta-data (added by MakeMaker)

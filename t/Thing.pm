@@ -11,7 +11,7 @@ use DBConnector;
   @OTHER_ATTRIBUTES=qw();
   %SYNONYMS=();
   %AUTODB=(-collection=>__PACKAGE__,
-	   -keys=>qq(name string, sex string, friends list(string))
+	   -keys=>qq(name string, sex string, friends list(object))
 	  );
   Class::AutoClass::declare(__PACKAGE__);
 

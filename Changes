@@ -17,3 +17,11 @@ Revision history
           this storage handling.
 0.07  Tue Aug 17 10:52:27 PDT 2004
        - require 5.8.2 added for perl version, manifest rebuilt to include patch files 
+0.08  Wed Sep  1 14:09:29 PDT 2004
+       - The following defects have been addressed (see also bug tracker at www.sf.net project: isbiology):
+       1016244  no persistence on (enclosed) test
+       1016246 	reformat of list sorage
+       1019348 	not all objects stored
+       1016242 	create flag not working for registry
+       1016238 	_registry_is_saved error
+       1017046 	not all objects stored

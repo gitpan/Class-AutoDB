@@ -87,23 +87,21 @@ sub tables {
     my $base_table=new Class::AutoDB::Table (-name=>$name,-keys=>$scalar_keys);
     my $tables=[$base_table];
     while(my($key,$type)=each %$list_keys) {
-      my($inner_type)=$type=~/^list\s*\(\s*(.*?)\s*\)/;
-      my $list_table=new Class::AutoDB::Table (-name=>$name.'_'.$key,
-						  -keys=>{$key=>$inner_type});
+      #my($inner_type)=$type=~/^list\s*\(\s*(.*?)\s*\)/;
+      my $list_table=new Class::AutoDB::Table (-name=>$name.'_'.$key, -keys=>{$key=>$type});
       push(@$tables,$list_table);
     }
     $self->_tables($tables);
   }
   wantarray? @{$self->_tables}: $self->_tables;
 }
+
 sub schema {
   my($self,$code)=@_;
+  #use Data::Dumper;
+  #print Dumper $self->tables;
   my @sql=map {$_->schema($code)} $self->tables;
   wantarray? @sql: \@sql;
-}
-sub tidy {
-  my $self=shift;
-  $self->_tables(undef);
 }
 
 sub _is_list_type {

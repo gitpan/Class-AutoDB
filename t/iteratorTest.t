@@ -6,7 +6,7 @@ use Thing;
 use Test::More qw/no_plan/;
 use Scalar::Util;
 
-my $DBC = new DBConnector();
+my $DBC = new DBConnector;
 my $dbh = $DBC->getDBHandle;
 
 

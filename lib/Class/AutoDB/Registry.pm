@@ -11,7 +11,7 @@ use Class::AutoDB::StoreCache;
 use Class::AutoDB::TypeMap;
 @ISA = qw(Class::AutoClass);
 
-@AUTO_ATTRIBUTES=qw(autodb oid object_table name2coll _exists);
+@AUTO_ATTRIBUTES=qw(dbh oid object_table name2coll _exists);
 @OTHER_ATTRIBUTES=qw();
 %SYNONYMS=();
 Class::AutoClass::declare(__PACKAGE__,\@AUTO_ATTRIBUTES,\%SYNONYMS);
@@ -32,8 +32,8 @@ sub _init_self {
   $self->object_table || $self->object_table($OBJECT_TABLE);
 }
 sub register {
-  my $self=shift;
-  my $registration=new Class::AutoDB::Registration(@_);
+  my ($self,$args)=@_;
+  my $registration=new Class::AutoDB::Registration($args);
   my $name2coll=$self->name2coll || $self->name2coll({});
   my @collections=$registration->collections;
   for my $name (@collections) {
@@ -71,78 +71,70 @@ sub merge {
 }
 # checks if registry is in db
 sub exists {
-  my ($self,$dbh)=@_;
-  $self->throw('requires a database handle') unless $dbh;
+  my ($self)=@_;
+  return 1 if $self->_exists;
+  $self->throw('requires a database handle') unless $self->dbh;
   my $object_table=$self->object_table;
-  my $tables=$dbh->selectall_arrayref(qq(show tables));
+  my $tables=$self->dbh->selectall_arrayref(qq(show tables));
   my $exists=grep {lc($object_table) eq lc($_->[0])} @$tables;
   $self->_exists($exists||0);
 }
 # prepare registry for insertion
 sub create {
   my $self=shift;
-  my @collections=_flatten(@_);
-  $self->autodb($sc->recall('Class::AutoDB'));
-  $self->throw("Cannot create registry or collections without a connected database") unless $self->autodb->is_connected;
-  my $dbh=$self->autodb->dbh;
-  $self->drop if $self->_exists;
+  my @collections = keys %{$self->{name2coll}} ? _flatten(values %{$self->{name2coll}}) : _flatten(@_);
+  $self->throw("Cannot create registry or collections without a connected database") unless $self->dbh;
   # create object table
   my $object_table=$self->object_table;
   my $sql="create table $object_table\($OBJECT_COLUMNS\)";
-  $dbh->do($sql);
+  $self->dbh->do($sql);
   $self->put;
   $self->_exists(1);
-  @collections=$self->collections;
   my @sql=map {$_->schema('create')} @collections;
   for my $sql (@sql) {
-    $dbh->do($sql);
+    $self->dbh->do($sql);
   }
 }
 
 sub drop {
   my $self=shift;
   my @collections=_flatten(@_);
-  my $autodb=$self->autodb;
-  $self->throw("Cannot drop registry or collections without a connected database") unless $autodb && $autodb->is_connected;
-  my $dbh=$autodb->dbh;
-  if (!@collections) {		# drop entire registry
-    # drop object table
+  $self->throw("Cannot drop registry or collections without a connected database") unless $self->dbh;
+  unless (@collections) {		# drop registry / leave collections in tact
     my $object_table=$self->object_table;
     my $sql="drop table if exists $object_table";
-    $dbh->do($sql);
+    $self->dbh->do($sql);
     $self->_exists(0);
-    @collections=$self->collections;
   } else {
-  my @sql=map {$_->schema('drop')} @collections;
-  for my $sql (@sql) {
-    $dbh->do($sql);
-  }
+  	  # have to rewrite registry without deleted collections
+  	  map { delete $self->{name2coll}->{$_->name}, "\n" } @collections;
+  	  $self->put;
+		  my @sql=map {$_->schema('drop')} @collections;
+		  for my $sql (@sql) {
+		    $self->dbh->do($sql);
+		  }
  }
 }
 sub alter {
   my $self=shift;
   my @diffs=_flatten(@_);
-  my $autodb=$self->autodb;
-  $self->throw("Cannot drop registry or collections without a connected database") unless $autodb && $autodb->is_connected;
-  my $dbh=$autodb->dbh;
+  $self->throw("Cannot drop registry or collections without a connected database") unless $self->dbh;
   my @sql;
   for my $diff (@diffs) {
     my $collection=$diff->other;
     push(@sql,$collection->alter($diff));
   }
   for my $sql (@sql) {
-    $dbh->do($sql);
+    $self->dbh->do($sql);
   }
 }
 
 sub do_sql {
   my $self=shift;
   my @sql=_flatten(@_);
-  my $autodb=$self->autodb;
-  $self->throw("Cannot run SQL without a connected database") unless $autodb && $autodb->is_connected;
-  my $dbh=$autodb->dbh;
+  $self->throw("Cannot run SQL without a connected database") unless $self->dbh;
   for my $sql (@sql) {
-    $dbh->do($sql);
+    $self->dbh->do($sql);
   }
 }
 
@@ -150,22 +142,21 @@ sub do_sql {
 ## be named something more descriptive and aliased for user ease
 # returns stored registry
 sub fetch {
-  my ($self,$dbh)=@_;
-  $self->throw('requires a database handle') unless $dbh;
-  return unless $self->_exists;
-  my $registry=$dbh->selectall_arrayref(qq(select * from $OBJECT_TABLE where id='$REGISTRY_OID'));
+  my ($self)=@_;
+  $self->throw('requires a database handle') unless $self->dbh;
+  return unless $self->exists;
+  my $registry=$self->dbh->selectall_arrayref(qq(select * from $OBJECT_TABLE where id='$REGISTRY_OID'));
 	my $thaw;
   eval $registry->[0][1]; # sets thaw
   return bless $thaw, __PACKAGE__; # just in case
 }
 # returns stored collections
 sub get {
-  my ($self,$dbh)=@_;
-  $dbh=$self->autodb->dbh unless $dbh;
-  $self->throw('requires a database handle') unless $dbh;
-  if ($self->_exists) {		# get from database if it exists
+  my ($self)=@_;
+  $self->throw('requires a database handle') unless $self->dbh;
+  if ($self->exists) {		# get from database if it exists
     my $object_table=$self->object_table;
-    my($freeze)=$dbh->selectrow_array
+    my($freeze)=$self->dbh->selectrow_array
       (qq(select object from $object_table where id="$REGISTRY_OID"));
     my $thaw;
     eval $freeze;		# sets $thaw
@@ -175,32 +166,23 @@ sub get {
 # insert registry into database
 sub put {
   my($self)=@_;
-  my $autodb=$self->autodb;
-  $self->throw("Cannot put registry without a connected database") unless $autodb && $autodb->is_connected;
+  $self->throw("Cannot put registry without a connected database") unless $self->dbh;
   # Make a shallow copy, deleting transient attributes
   my $copy={_CLASS=>ref($self)};
   while(my($key,$value)=each %$self) {
-    next if grep {$key eq $_} qw(autodb _exists);
+    next if grep {$key eq $_} qw(autodb _exists dbh);
     $copy->{$key}=$value;
   }
-  map {$_->tidy;} @{$self->collections}; # remove transient data from collections
   $tm->load($self->collections); # cache in-memory collections
-  my $dumper=new Data::Dumper([undef],['thaw'])->Purity(1)->Indent(0);
+  my $dumper=new Data::Dumper([undef],['thaw'])->Purity(1)->Indent(1);
   my $freeze=$dumper->Values([$copy])->Dump;
-  my $dbh=$autodb->dbh;
   my $object_table=$self->object_table;
-
-   ## TODO: flow is icky. create makes collection table and calls put, so
-   ## that $self->exists is true while $self->_exists if false
-   my $sth;
-   eval {$sth= $self->_exists ?
-     $dbh->prepare(qq(update $object_table set object=? where id="$REGISTRY_OID")) :
-       $dbh->prepare (qq(insert into $object_table(id, object) values("$REGISTRY_OID",?)))};
-   $sth->bind_param(1,$freeze);
-   $sth->execute;
-   if($@){
-    $dbh->rollback;
-    $self->throw("write operation on table $object_table failed, pending writes were rolled back");                                           
+  my $sth = $self->dbh->prepare (qq(replace into $object_table(id, object) values("$REGISTRY_OID",?)));
+  $sth->bind_param(1,$freeze);
+  $sth->execute;
+  if($sth->errstr){
+   $self->dbh->rollback;
+   $self->throw("write operation on table $object_table failed, pending writes were rolled back");                                           
   }  
   $self->_exists(1); 
 }

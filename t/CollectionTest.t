@@ -14,11 +14,11 @@ use strict;
   
   my($sql, @sql);
   @sql=$named_reference_object->schema;
-  is($sql[0],"create table testing (object varchar(10) not null, primary key (object))","test_schema gets create statement by default  (array context)");
+  is($sql[0],"create table testing (object varchar(15) not null, primary key (object))","test_schema gets create statement by default  (array context)");
   $sql=$named_reference_object->schema;
-  is($sql->[0],"create table testing (object varchar(10) not null, primary key (object))","test_schema gets create statement by default (scalar context)");
+  is($sql->[0],"create table testing (object varchar(15) not null, primary key (object))","test_schema gets create statement by default (scalar context)");
   @sql=$named_reference_object->schema('create');
-  is($sql[0],"create table testing (object varchar(10) not null, primary key (object))","test_schema gets create statement with 'create' arg");
+  is($sql[0],"create table testing (object varchar(15) not null, primary key (object))","test_schema gets create statement with 'create' arg");
   $sql=$named_reference_object->schema('drop');
   is($sql->[0],"drop table if exists testing","test_schema gets drop statement with 'drop' arg");
   ## UNIMPLEMENTED - skip 
@@ -94,7 +94,7 @@ use strict;
   is($tables->[0]->{_keys}->{color}, "string", "table _keys look good");
   is($tables->[0]->{_keys}->{significant_other}, "object", "table _keys look good");
   is($tables->[1]->{name}, "testing_friends", "testing naming convention collectionName_listName upheld");
-  is($tables->[1]->{_keys}->{friends}, "object", "tables contains list of type object");
+  is($tables->[1]->{_keys}->{friends}, "list(object)", "tables contains list of type object");
                                                                
   $named_reference_object->register($reg1);
   is($named_reference_object->alter($diff)->[0],'alter table testing add color longtext,add petals int', 'alter() returns expected alter statement');
