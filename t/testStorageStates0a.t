@@ -5,16 +5,16 @@ use Scalar::Util;
 use DBConnector;
 use Class::AutoDB;
 use Person;
-no warnings; ## suppress unititialized variable warnings
+no warnings; ## suppress unititialized varibale warnings
 
-my $DBC = new DBConnector( noclean => 1 );
+my $DBC = new DBConnector(noclean=>1);
 my $dbh = $DBC->getDBHandle;
 
 ## the testStorageStatesX (where X is an integer) series of tests puts AutoDB through a bunch of storage scenarios, 
-## using both explicit (calling the store method on an object) and implicit (letting an object fall out of scope 
+# using both explicit (calling the store method on an object) and implicit (letting an object fall out of scope 
 ## and be automatically written) methods of persistence.
 
-# testStorageStates1a specifically sets up for testing implicit persistence of compound (having a list) objects
+# testStorageStates0 specifically tests implicit persistence of simple (no list) objects
 
 SKIP: {
         skip "! Cannot test without a database connection - please adjust DBConnector.pm's connection parameters and \'make test\' again", 1 unless $DBC->can_connect;
@@ -24,17 +24,12 @@ SKIP: {
                           -user=>$DBConnector::DB_USER,
                           -password=>$DBConnector::DB_PASS
                         ); 
- my($bid,$jid,$mid);                       
-                                         
+                        
   my $joe=new Person(-name=>'Joe',-sex=>'male');
   my $mary=new Person(-name=>'Mary',-sex=>'female');
   my $bill=new Person(-name=>'Bill',-sex=>'male');
   
-  # Set up friends lists
-  $joe->friends([$mary,$bill]);
-  $mary->friends([$joe,$bill]);
-  $bill->friends([$joe,$mary,'a doll named sue']);
-  
+  # objects will be persisted once they go out of scope
   is(1,1); #just to quiet the test harness ;)
-  sleep 1; # give I/O time to catch up before test harness pulls our handle
 }
+1;

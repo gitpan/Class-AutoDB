@@ -23,5 +23,6 @@ my $bill=new Person(-name=>'Bill',-sex=>'male');
 $joe->friends([$mary,$bill]);
 $mary->friends([$joe,$bill]);
 $bill->friends([$joe,$mary]);
-# No need to explicitly store the objects. AutoDB willstore them
+
+# No need to explicitly store the objects. AutoDB will store them
 # automatically when they are no longer referenced or when the program ends

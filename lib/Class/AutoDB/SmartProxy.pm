@@ -1,58 +1,64 @@
 package Class::AutoDB::SmartProxy;
-
 use strict;
 use Data::Dumper;
 use Class::AutoDB::StoreCache;
 use Class::AutoDB::DeleteCache;
+use Class::AutoDB::TypeMap;
 use Class::AutoClass;
 use DBI;
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS @EXPORT);
-@ISA=qw(Class::AutoClass);
-
-@AUTO_ATTRIBUTES=qw();
-@OTHER_ATTRIBUTES=qw();
-%SYNONYMS=( is_del => 'is_deleted' );
+@ISA              = qw(Class::AutoClass);
+@AUTO_ATTRIBUTES  = qw(dbh dsn dbd database host user password);
+@OTHER_ATTRIBUTES = qw();
+%SYNONYMS         = ( is_del => 'is_deleted' );
 Class::AutoClass::declare(__PACKAGE__);
 
 # global static references to caches
-my $sc = Class::AutoDB::StoreCache->instance();
-my $dc = Class::AutoDB::DeleteCache->instance();
+my $sc     = Class::AutoDB::StoreCache->instance();
+my $dc     = Class::AutoDB::DeleteCache->instance();
+my $tm     = new Class::AutoDB::TypeMap;
+my $dumper =
+	new Data::Dumper( [undef], ['thaw'] )->Purity(1)->Indent(1)->Freezer('DUMPER_freeze')
+	->Toaster('DUMPER_thaw');
 
-my $tm = new Class::AutoDB::TypeMap;
-my $dumper = new Data::Dumper([undef],['thaw'])->Purity(1)->Indent(1)->
-  Freezer('DUMPER_freeze')->Toaster('DUMPER_thaw');
-  
-my %state; # keep track of object state [undef|NULL]
-my %handler; # keep track of object's storage method [auto|manual]
-my $destroyed = 0; # global flag to track when destruction begins
-  
 sub _init_self {
-  my($self,$class,$args)=@_;
-  return if $self->{__object_id}; # already exists
-  return if ref $self eq __PACKAGE__; # don't proxy yourself
-  $self->{__proxy_for}=$args->collection_name || ref $self; # don't forget your roots
-  $self->{__object_id}=_getUID();
-  return $self;
+	my ( $self, $class, $args ) = @_;
+	return if $self->{__object_id};        # already exists
+	return if ref $self eq __PACKAGE__;    # don't proxy yourself
+	$self->{_CLASS} = ref $self;
+	$self->{__object_id} = _getUID();
+	return $self;
 }
 
 sub DUMPER_freeze {
-  my($self)=@_;
-  my $id = $self->{__object_id} || _getUID();
-  my $proxy_for = $self->{__proxy_for} || ref $self;
-  return bless { __object_id=>$id,__proxy_for=>$proxy_for }, __PACKAGE__;
+	my ($self) = @_;
+	my $id        = $self->{__object_id} || _getUID();
+	my $proxy_for = $self->{_CLASS} || ref $self;
+	return bless { __object_id => $id, _CLASS => $proxy_for }, __PACKAGE__;
 }
-
-### in the future, thaw should handle object reconstitution - checking whether an instance exists in the
-### cache or needs to be drawn from the data store. This is currently handled by the AUTOLOAD method (though 
+### in the future, DUMPER_thaw should handle object reconstitution - checking whether an instance exists in the
+### cache or needs to be drawn from the data store. This is currently handled by the AUTOLOAD method (though
 ### caching is not well handled)
 sub DUMPER_thaw {
- return $_[0];
+	return $_[0];
 }
 
 # return a globally unique id string
 # insert will require a unique ID. Done here (vs. DB autoincrementing) for portability.
 sub _getUID {
-	return  int '1'. substr(rand(time . $$),1,14); # starting with a zero causes all sorta heartache
+	return
+		int '1' . substr( rand( time . $$ ), 1, 14 );  # starting with a zero causes all sorta heartache
+}
+
+# this routine is strongly tied to the structure of SmartProxy's generated key
+# if _getUID changes, so should this!
+# future plans -> use a checksum to authenticate the key
+sub is_valid_key {
+	no warnings;    # stop complaints when checking unitialized values
+	my ( $self, $key ) = @_;
+	$key = $self unless $key;    # allow to be called as class method
+	$key =~ /(^1[0-9]+)/;
+	return length($1) > 0 ? 1 : 0;
 }
 
 # store() is only called by the user for explicit writes to the data store.
@@ -61,207 +67,206 @@ sub _getUID {
 # will not occur for an object that has been manually stored (this is to ensure the integrity
 # of the object that you stored).
 sub store {
-  my $self = shift;
-  $handler{$self->{__object_id}} = 'manual';
-  $self->_persist;
+	my $self = shift;
+	$self->__handler('manual');    # keep track of object's storage method [auto|manual]
+	_persist($self->__object_id);
+}
+
+sub _is_persistable {
+	my $obj = shift;
+		UNIVERSAL::isa( $obj, __PACKAGE__ )
+		and not ref($obj) eq __PACKAGE__
+		? 1
+		: 0;
 }
 
 sub _persist {
-  my ($self,$freeze)=@_;
-  # return unless we can access AutoDB members - this happens during global cleanup
-  my $adb = $sc->recall("Class::AutoDB") or return;
-  my $registry = $adb->{registry} or return;
-  my $dbh = $adb->{dbh} or return;
-  my $persistable_name = $self->{__proxy_for} || $self->throw("Not sure who object is proxying");
-  my $oid = $self->{__object_id} || $self->throw("No object ID was associated with this object");
-  my (%collVals, %list);
-  return if ( $destroyed and $handler{$oid} and $handler{$oid} eq 'manual' );
-  
-  # need the frozen object somehow
-  unless ( $freeze ) {
-     unless ( $freeze = $sc->recall($oid) ) {
-        $freeze = $self->_wrap;
-     }
-  }
-
-  my $persistable = $self->_unwrap($oid);
-  
-  # filter out all but the searchable keys
-  foreach my $collection ($registry->collections) {
-    next unless $collection->name eq $persistable_name;
-	  	while(my($k,$v) = each %{$collection->_keys}) {
-	  	  next unless exists $persistable->{$k};
-		    # handle lists
-		    if($v =~ /list\(\w+\)/) {
-		      next unless $self->{$k};
-		      $persistable->{$k} = $tm->clean($v, $persistable->{$k})
-		        unless $tm->is_valid($v, $persistable->{$k});
-			    foreach my $item (@{$persistable->{$k}}) {
-		        # if items are scalar, just insert them. If they are SmartProxy objects, insert OIDs
-            push @{$list{"$persistable_name"."_$k"}}, ref $item ? $item->{__object_id} : $item;
-		      }
-		      # insert list names into object (delete requires it)
-		        $self->{__listname} = [keys %list];
-		      # delete from top-level search keys (handled)
-		      delete $persistable->{$k};
-		   # object types will be stored with their oid as value
-		   } elsif ($v =~ /object/) {
-		       unless($tm->is_valid($v, $persistable->{$k})) {
-		        $self->warn("non-AutoDB objects cannot be stored in this manner");
-		        $collVals{$k} = undef;
-		       } else {
-		         my $oid = $persistable->{$k}->{__object_id} ||
-		           $self->throw("stored object does not contain an object id (oid)");
-		        $collVals{$k} = $oid;
-		       }
-		   }  else {
-	       # handle other keys - only simple scalars (strings) should reach here
-	       unless($tm->is_valid($v, $persistable->{$k})) {
-	         $self->warn("cannot store references and objects using type $v - value stored as undef");
-	         undef $persistable->{$k};
-	       } else {
-	         $collVals{$k} = $persistable->{$k};
-	       }
-		   }
-	   }
-  }
-     
-  my ($aggInsertCollKeys,@aggInsertableValues,$aggInsertableValues);
-  # prepare searchable keys
-	if (values %$persistable) {
-	  ($aggInsertCollKeys) = join ",",'object', keys %collVals;
-	  while(my($k,$v) = each %$persistable) {
-	  	next if $k =~ /^__/; # filter system nvp's
-	    push @aggInsertableValues, DBI::neat($collVals{$k}) if $collVals{$k};
+	my $uid = shift;
+	my ( $dbh );
+	my $persistable = _unwrap($uid);
+	return unless _is_persistable($persistable);
+	my $registry = _unwrap($Class::AutoDB::Registry::REGISTRY_OID);
+	# reconstuct dbh
+	$dbh = Class::AutoDB::_connect($persistable) || $persistable->throw("cannot connect to database");
+	my $oid = $persistable->{__object_id} || $persistable->throw("No object ID was associated with this object");
+	my $collections = $sc->recall($persistable->{_CLASS});
+	my $class = $persistable->{_CLASS};
+	# insert collection names into object (makes it faster to delete)
+	$persistable->{__collections} = $collections;
+	foreach my $collection_name (@$collections) {
+	  	my ( %collVals, %list );
+		# filter out all but the searchable keys
+		  my $collection = $registry->collection($collection_name);
+		  return unless $collection;
+			while ( my ( $k, $v ) = each %{ $collection->_keys } ) {
+				next unless  $persistable->{$k};
+				if ( $v =~ /list\(\w+\)/ ) { # handle lists
+					next unless $persistable->{$k};
+					$persistable->{$k} = $tm->clean( $v, $persistable->{$k} )
+						unless $tm->is_valid( $v, $persistable->{$k} );
+					foreach my $item ( @{ $persistable->{$k} } ) {
+						# if items are scalar, just insert them. If they are SmartProxy objects, insert OIDs
+						push @{ $list{ "$collection_name" . "_$k" } }, ref $item ? $item->{__object_id} : $item;
+					}
+					# insert list names into object (makes it faster to delete)
+					$persistable->{__listname} = [ keys %list ];
+				} elsif ( $v =~ /object/ ) { # object types will be stored with their oid as value
+					unless ( $tm->is_valid( $v, $persistable->{$k} ) ) {
+						$persistable->warn("non-AutoDB objects cannot be stored in this manner");
+						$collVals{$k} = undef;
+					} else {
+						my $oid = $persistable->{$k}->{__object_id}
+							|| $persistable->throw("stored object does not contain an object id (oid)");
+						$collVals{$k} = $oid;
+					}
+				} else { # handle other keys - only simple scalars (strings) should reach here
+					unless ( $tm->is_valid( $v, $persistable->{$k} ) ) {
+						$persistable->warn("cannot store references and objects using type $v - value stored as undef");
+						undef $persistable->{$k};
+					} else {
+						$collVals{$k} = $persistable->{$k};
+					}
+				}
+			}
+			my (@aggInsertCollKeys, $aggInsertCollKeys, @aggInsertableValues, $aggInsertableValues );
+			# prepare searchable keys
+			if ( values %$persistable ) {
+				($aggInsertCollKeys) = join ",", 'oid', keys %collVals;
+				while ( my ( $k, $v ) = each %{$collection->{_keys}} ) {
+					next if $k =~ /^__/;    # filter system-specific keys
+					push @aggInsertableValues, DBI::neat( $collVals{$k} ) if $collVals{$k};
+					push @aggInsertCollKeys, $k if $collVals{$k};
+				}
+				unshift @aggInsertableValues, $oid;
+				($aggInsertableValues) = join ",", @aggInsertableValues;    # format for insertion
+				($aggInsertCollKeys) = join ",", 'oid', @aggInsertCollKeys;
+			} else {                                                      # only the object_id is present
+				$aggInsertCollKeys   = 'oid';
+				$aggInsertableValues = $oid;
+			}
+			# handle collection associations (this object may be associated with multiple collections)
+				my $c = $dbh->prepare(qq/insert into $Class::AutoDB::Registry::COLLECTION_TABLE values(?,?,?)/);
+				$c->bind_param( 1, $oid );
+				$c->bind_param( 2, $class );
+				$c->bind_param( 3, $collection_name );
+				$c->execute;
+			# handle serialized object insertion
+			my $freeze = $persistable->_wrap;
+			my $so;
+			$so = $dbh->prepare(qq/replace into $Class::AutoDB::Registry::OBJECT_TABLE(oid,object) values(?,?)/);
+			$so->bind_param( 1, $persistable->{__object_id} );
+			$so->bind_param( 2, $freeze );
+			$so->execute;
+			# handle top-level search keys
+			$dbh->do(qq/replace into $collection_name($aggInsertCollKeys) values($aggInsertableValues)/);
+			warn("$DBI::errstr") if $DBI::errstr;
+			# handle list search keys
+			foreach my $list_name ( keys %list ) {
+				$dbh->do(qq/delete from $list_name where oid="$oid"/);
+				foreach my $li ( @{ $list{$list_name} } ) {
+					next unless $li;
+					my $skl = $dbh->prepare(qq/insert into $list_name values(?,?)/);
+					$skl->bind_param( 1, $oid );
+					$skl->bind_param( 2, $li );
+					$skl->execute;
+				}
+			}
 	  }
-	  unshift @aggInsertableValues, $oid;
-	  ($aggInsertableValues) = join ",", @aggInsertableValues; # format for insertion
-	} else { # only the object_id is present
-	   $aggInsertCollKeys = 'object';
-	   $aggInsertableValues = $oid;
-	}
-  
-  # handle serialized object insertion
-  my $so;
-  $so = $dbh->prepare(qq/replace into $Class::AutoDB::Registry::OBJECT_TABLE values(?,?)/);
-	$so->bind_param(1,$persistable->{__object_id});
-	$so->bind_param(2,$freeze);
-	$so->execute;
-	$self->throw("object serialization failed") if $@;
-
-  ### handle top-level search keys
-  $dbh->do(qq/replace into $persistable_name($aggInsertCollKeys) values($aggInsertableValues)/);
-  # handle list search keys
-  foreach my $list_name ( keys %list ) {
-  	$dbh->do(qq/delete from $list_name where object="$oid"/);
-    foreach my $li (@{$list{$list_name}}) {
-	    my $skl = $dbh->prepare(qq/insert into $list_name values(?,?)/);
-		  $skl->bind_param(1,$oid);
-		  $skl->bind_param(2,$li);
-	    $skl->execute;
-    }
-  }
+  bless $persistable, 'NULL'; # mark for destruction
 }
 
 # given an object, will freeze the object and cache it
 sub _wrap {
-  my($self,$store)=@_;
-  $store ||= $self;
-  return unless $tm->is_inside($store);
-  my $oid = "$store->{__object_id}";
-  
-  # Make a shallow copy, replacing independent objects with:
-  # stored reps if they are AutoDB able or
-  # nothing if they are not (ignore non-AutoDB objs)
-  my $persistable={__proxy_for=>$store->{__proxy_for}};
-  while(my($key,$value)=each %$store) {
-    if ($tm->is_inside($value)) {
-      $persistable->{$key}=$value->DUMPER_freeze;
-     } elsif ($tm->is_outside($value)) {
-       $persistable->{$key}=$value;
-     } else {
-        $persistable->{$key}=$value;
-     }
-  }
-  # serialize whole object
-  $dumper->Reset;
-  my $freeze=$dumper->Values([$persistable])->Dump;
-  $sc->cache( $oid, $freeze );
-  return $freeze;
+	my ( $self, $store ) = @_;
+	$store ||= $self;
+	return unless $tm->is_inside($store);
+	my $oid = "$store->{__object_id}";
+	# Make a shallow copy, replacing independent objects with:
+	# stored reps if they are AutoDB able or
+	# nothing if they are not (ignore non-AutoDB objs)
+	my $persistable = { _CLASS => $store->{_CLASS} };
+	while ( my ( $key, $value ) = each %$store ) {
+		if ( $tm->is_inside($value) ) {
+			$persistable->{$key} = $value->DUMPER_freeze;
+		} elsif ( $tm->is_outside($value) ) {
+			$persistable->{$key} = $value;
+		} else {
+			$persistable->{$key} = $value;
+		}
+	}
+
+	# serialize whole object - excluding database handle (DBI complains)
+	delete $persistable->{dbh};
+	$dumper->Reset;
+	my $freeze = $dumper->Values( [$persistable] )->Dump;
+	$sc->cache( $oid, $freeze );
+	return $freeze;
 }
 
-# given an oid, will retrieve the frozen object from the cache, 
+# given an oid, will retrieve the frozen object from the cache,
 # defrost it and return it to the caller (returns false if object not cached)
-# this instance is marked as NULL so that it won't be persisted
 sub _unwrap {
-  my($self,$oid)=@_;
-  my $fetched = $sc->recall($oid);
-  return 0 unless $fetched;
-  my $thaw;
-  eval $fetched; # sets thaw
-  $thaw->{__state} = 'NULL'; # inhibits persistence
-  return bless $thaw, $thaw->{__proxy_for};
+	my $oid     = shift;
+	my $fetched = $sc->recall($oid);
+	return 0 unless $fetched;
+	my $thaw;
+	eval $fetched;    # sets thaw
+	my $name = $thaw->{_CLASS};
+	return bless $thaw, $name;
 }
 
 sub AUTOLOAD {
-  my ($self,$value)=@_;
-  my $class = ref $self;
-  our $AUTOLOAD =~ /.*::(\w+)$/;
-  my $oid = $self->{__object_id};
-  $self->throw("requires oid (unique object identifier)") unless $oid;
-  
-  # set value - set never checks cache, only updates it.
-  if ($value) {
-   $self->{$1}=$value;
-   #$sc->cache($self->{__object_id},$self);
-   $self->_wrap;
-  }
-  else { # return value, no update
-      if ($self->{$1}) { # from cache
-        return $self->{$1};
-      } else { # have to go to data store
-          my $sql = qq/SELECT * FROM $Class::AutoDB::Registry::OBJECT_TABLE WHERE id='$oid'/;
-          my $hash_ref = $sc->recall("Class::AutoDB")->{dbh}->selectall_hashref($sql,1);
-          $self->warn("Query: <$sql> produced no results") && return unless $hash_ref;
-          my $frozen = $hash_ref->{$oid}->{'object'};
-          my $thaw;
-          no warnings; # otherwise the test harness gets unitialized warnings
-          eval $frozen; # sets thaw
-          #$sc->cache($self->{__object_id},$thaw);
-          return $thaw->{$1} ? $thaw->{$1} : undef;
-    }
-  }
+	my ( $self, $value ) = @_;
+	our $AUTOLOAD =~ /.*::(\w+)$/;
+	return if $AUTOLOAD eq 'DESTROY';    # the books say you should do this
+	my $oid = $self->{__object_id};
+	$self->throw("requires oid (unique object identifier)") unless $oid;
+
+	# set value - set never checks cache, only updates it.
+	if ($value) {
+		$self->{$1} = $value;
+
+		#$sc->cache($self->{__object_id},$self);
+		$self->_wrap;
+	} else {                             # return value, no update
+		if ( $self->{$1} ) {               # from cache
+			return $self->{$1};
+		} else {                           # have to go to data store
+			my $sql = qq/SELECT * FROM $Class::AutoDB::Registry::OBJECT_TABLE WHERE oid='$oid'/;
+			my $hash_ref = $sc->recall("Class::AutoDB")->{dbh}->selectall_hashref( $sql, 1 );
+			$self->warn("Query: <$sql> produced no results") && return unless $hash_ref;
+			my $frozen = $hash_ref->{$oid}->{'object'};
+			my $thaw;
+			no warnings;                     # otherwise the test harness gets unitialized warnings
+			eval $frozen;                    # sets thaw
+			#$sc->cache($self->{__object_id},$thaw);
+			return $thaw->{$1} ? $thaw->{$1} : undef;
+		}
+	}
 }
 
 sub is_deleted {
-  my ($self)=@_;
-  my $oid = $_[0]->{__object_id};
-  my $flag = 0;
-  $flag = $dc->recall($oid) ? 1 : 0; # EZ case
-  unless($flag) { # gotta go dig for it
-    my $dbh = $sc->recall("Class::AutoDB")->{dbh} 
-      || return $flag=0;
-    my $sql = qq/SELECT object FROM $Class::AutoDB::Registry::OBJECT_TABLE WHERE id='$oid'/;
-    my $hash_ref = $dbh->selectall_hashref($sql,1);
-    $self->warn("Query: <$sql> produced no results") && return unless $hash_ref;
-    $flag=1 if $hash_ref->{$oid}->{'object'};
-    $dc->cache($oid,$self);
-  }
-  return $flag;
+	my ($self) = @_;
+	my $oid    = $_[0]->{__object_id};
+	my $flag   = 0;
+	#$flag = $dc->recall($oid) ? 1 : 0;    # EZ case
+	unless ($flag) {                      # gotta go dig for it
+		my $dbh = $sc->recall("Class::AutoDB")->{dbh}
+			|| $self->throw("cannot establish a database connection");
+		my $sql = qq/SELECT count(*) FROM $Class::AutoDB::Registry::OBJECT_TABLE WHERE oid='$oid'/;
+		my $count = $dbh->selectrow_array( $sql);
+		$flag = $count ? 0 : 1;
+		$dc->cache( $oid, $self );
+	}
+	return $flag;
 }
 
 sub DESTROY {
- my ($self) = @_;
- return if ref $self eq __PACKAGE__; # skip top-level SP objects (but not derived classes)
- if ($self->can("store")) {
-   return if ($self->{__state} and $self->{__state} eq 'NULL'); # ignore objs with state=NULL, they are cache copies
-   $destroyed = 1; # signal that glabal destruction has begun
-   $self->_persist;
- }
+	my $obj = shift;
+	return if $obj->{__handler} && $obj->{__handler} eq 'manual';
+	_persist($obj->{__object_id}) if _is_persistable($obj);
 }
-
 1;
-
 __END__
 
 
@@ -335,6 +340,13 @@ The rest of the documentation describes the methods.
 # Returns : 1 if deleted, 0 otherwise
 # Args    : none
 # Notes   : checks cache for objects deleted in current session, otherwise checks database
+
+# Title   : is_valid_key
+# Usage   : $obj->is_valid_key($some_key);
+# Function: checks if key _could have been_ created by _getUID
+# Returns : 1 if true, 0 otherwise
+# Args    : the key to check
+# Notes   :
 
 # Title   : store
 # Usage   : $obj->store;

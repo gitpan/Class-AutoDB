@@ -9,8 +9,6 @@ use Class::AutoDB::Collection;
 %SYNONYMS=();
 Class::AutoClass::declare(__PACKAGE__);
 
-my $coll = new Class::AutoDB::Collection;
-
 sub _init_self {
   my($self,$class,$args)=@_;
   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
@@ -87,7 +85,8 @@ sub is_valid {
       } elsif ($1 =~ /mixed/ or not $1) { # mixed type
           foreach (@$value) {
             $ok_cnt++  if 
-              $self->is_inside($_) or not
+              $self->is_inside($_)  or 
+              $self->is_outside($_) or not
               ref $_;
           }
         $flag = 1 if $ok_cnt == $cnt;

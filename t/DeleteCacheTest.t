@@ -2,7 +2,6 @@ use lib qw(. t ../lib);
 use strict;
 use Test::More qw/no_plan/;
 use Class::AutoDB::DeleteCache;
-use Data::Dumper; # only for testing
 
 # Title   : instance
 # Usage   : $dc = Class::AutoDB::DeleteCache->instance();

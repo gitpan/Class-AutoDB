@@ -6,7 +6,7 @@ use Class::AutoClass;
 use Class::AutoDB::Table;
 @ISA = qw(Class::AutoClass); # AutoClass must be first!!
 
-@AUTO_ATTRIBUTES=qw(name _keys _tables _cmp_data);
+@AUTO_ATTRIBUTES=qw(name _keys _tables _cmp_data _collection);
 @OTHER_ATTRIBUTES=qw(register);
 %SYNONYMS=();
 Class::AutoClass::declare(__PACKAGE__);
@@ -17,19 +17,16 @@ sub _init_self {
 }
 sub register {
   my $self=shift;
-  my @registrations=_flatten(@_);
-  my $keys=$self->keys || $self->keys({});
-
-  for my $reg (@registrations) {
-    my $reg_keys=$reg->keys;
-    while(my($key,$type)=each %$reg_keys) {
-      $type=lc $type;
-      $keys->{$key}=$type, next unless defined $keys->{$key};
-      $self->throw("Inconsistent registrations for search key $key: types are ".$keys->{$key}." and $type") unless $keys->{$key} eq $type;
-    }
+  my ($registration)=_flatten(@_);
+  my $keys;
+  #populate keys  	
+  my $reg_keys=$registration->keys;
+  while(my($key,$type)=each %$reg_keys) {
+  	next unless defined $type;
+    $keys->{$key}=lc $type;
   }
   $self->_keys($keys);
-  $self->_tables(undef);	# clear computed value so it'll be recomputed next time 
+  $self->_tables(undef);	# clear computed value so it'll be recomputed next time use 
 }
 sub keys {
   my $self=shift;
@@ -38,13 +35,14 @@ sub keys {
 }
 sub merge {
   my($self,$diff)=@_;
-  return unless UNIVERSAL::isa($diff, "Class::AutoDB::CollectionDiff");
+  return unless UNIVERSAL::isa($diff, 'Class::AutoDB::CollectionDiff');
   my $keys=$self->keys || {};
   my $new_keys=$diff->new_keys;
   warn("merging empty collections") unless (CORE::keys %{$diff->baseline} || CORE::keys %{$diff->other});
   @$keys{CORE::keys %$new_keys}=values %$new_keys;
   $self->keys($keys);
-  $self->_tables(undef);	# clear computed value so it'll be recomputed next time 
+  $self->_tables(undef);	# clear computed value so it'll be recomputed next time
+  return $self;
 }
 sub alter {
   my($self,$diff)=@_;
@@ -75,9 +73,9 @@ sub tables {
   my $self=shift;
   return $self->_tables(@_) if @_;
   unless (defined $self->_tables) {
-    my $name=$self->name || $self->warn("no collection name specified, using system default: $Class::AutoDB::Registry::OBJECT_TABLE");
+    my $name=$self->name;
+    $self->throw("no collection name specified") unless $name;
     # Collection has one 'base' table for scalar keys and one 'list' table per list key
-    #
     # Start by splitting keys into scalar vs. list
     my $keys=$self->keys;
     my($scalar_keys,$list_keys);
@@ -87,7 +85,6 @@ sub tables {
     my $base_table=new Class::AutoDB::Table (-name=>$name,-keys=>$scalar_keys);
     my $tables=[$base_table];
     while(my($key,$type)=each %$list_keys) {
-      #my($inner_type)=$type=~/^list\s*\(\s*(.*?)\s*\)/;
       my $list_table=new Class::AutoDB::Table (-name=>$name.'_'.$key, -keys=>{$key=>$type});
       push(@$tables,$list_table);
     }
@@ -98,8 +95,6 @@ sub tables {
 
 sub schema {
   my($self,$code)=@_;
-  #use Data::Dumper;
-  #print Dumper $self->tables;
   my @sql=map {$_->schema($code)} $self->tables;
   wantarray? @sql: \@sql;
 }
@@ -107,6 +102,8 @@ sub schema {
 sub _is_list_type {
   $_[0]=~/^list\s*\(/;
 }
+
+# return list
 sub _flatten {
 	map {'ARRAY' eq ref($_) ? @$_: $_} @_;
 }

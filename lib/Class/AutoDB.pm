@@ -1,5 +1,5 @@
 package Class::AutoDB;
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 require 5.8.2;
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
 use strict;
@@ -13,6 +13,7 @@ use Class::AutoDB::Cursor;
 use Class::AutoDB::SmartProxy;
 use Class::AutoDB::StoreCache;
 use Class::AutoDB::DeleteCache;
+use Storable; # for dclone
 
 @ISA=qw(Class::AutoClass);
 
@@ -26,7 +27,7 @@ my $dc = Class::AutoDB::DeleteCache->instance();
 		      session cursors diff
 		      _needs_disconnect _db_cursor );
 @OTHER_ATTRIBUTES=qw(server=>'host');
-%SYNONYMS=( delete => 'del' );
+%SYNONYMS=( delete=>'del' );
 Class::AutoClass::declare(__PACKAGE__);
 
 use vars qw($AUTO_REGISTRY $AUTODB);
@@ -50,9 +51,8 @@ sub _init_self {
     # create registry if it doesn't already exist (this will happen when find is passed as a constructor param to AutoDB)
     $self->_manage_registry($args);
     my $cursor=$self->_manage_query($args);
-    # AutoClass expects to send back an AutoClass object, so we displace it here
-    undef %$self;
-	  %$self=%$cursor;
+    # AutoClass expects to send back an AutoClass object, so we switch it here
+    %$self=%$cursor; # shallow will do
     return bless $self, ref($cursor);
   }
 }
@@ -72,22 +72,13 @@ sub _manage_registry {
   $ro ? $self->_drop(0) : $self->_drop($args->drop);
   $ro ? $self->_create(0) : $self->_create($args->create);
   $ro ? $self->_alter(0) : $self->_alter($args->alter);
-
   my $count=($self->_create>0)+($self->_alter>0)+($self->_drop>0);
   $self->throw("It is illegal to set more than one of -create, -alter, -drop") if $count>1;
   $self->throw("Schema changes not allowed by -read_only or -read_only_schema setting") if $count && $ro;
-  # get saved registry and merge with in-memory registry
-  my $in_memory=$self->registry;
-  my $saved;
-  if ($self->_registry_is_saved) {
-    $saved=$self->_fetch_registry;
-  } else {
-    $saved=$AUTO_REGISTRY;
-    $self->create(1);
-  }
-  my $diff=new Class::AutoDB::RegistryDiff(-baseline=>$saved,-other=>$in_memory);
-  unless ($diff->is_equivalent) {		# in-memory schema adds something to saved schema
-    $self->throw("In-memory and saved registries are inconsistent") unless $diff->is_consistent;
+  $self->registry || $self->registry($AUTO_REGISTRY);
+  $self->diff($self->registry->diff($self->dbh));
+  unless ($self->diff->is_equivalent) {		# in-memory schema adds something to saved schema
+    $self->throw("In-memory and saved registries are inconsistent") unless $self->diff->is_consistent;
     $self->throw("In-memory registry adds to saved registry, but schema changes are not allowed by -read_only or -read_only_schema setting") if $ro;
     unless ($count) {
       # alter-if-exists case -- can only add collections
@@ -98,12 +89,9 @@ sub _manage_registry {
         $self->throw("Schema does not exist, but schema creation prevented by -create=>0");
       }
     }
-    $saved->merge($diff);
+    $self->registry->merge($self->diff);
   }
-  $self->registry($saved);
   $self->registry->dbh($self->dbh);
-  $self->diff($diff);
-  
   # Now do specified schema operations
   $self->drop, return if $self->_drop;
   $self->create, return if $self->_create;
@@ -125,43 +113,49 @@ sub connect {
 sub _connect {
   my($self)=@_;
   return $self->dbh if $self->dbh;		# if dbh set, then already connected
-  return unless $self->database || $self->dsn;
+  my $dsn = $self->dsn || $sc->recall('dsn');
   my $dbd=lc($self->dbd)||'mysql';
   $self->throw("-dbd must be 'mysql' at present") if $dbd ne 'mysql';
-  my $dsn;
-  if ($self->dsn) {			# parse off the dbd, database, host elements
-    $dsn = $self->dsn;
+  if ($dsn) {			# parse off the dbd, database, host elements
     $dsn = "DBI:$dsn" unless $dsn=~ /^dbi/i;
-  } else {
-    my $database=$self->database;
+  } elsif (my $database=$self->database) {
     my $host=$self->host || 'localhost';
     $dsn="DBI:$dbd:database=$database;host=$host";
+  } else {
+  	$self->warn("inadequate parameters were passed. A dsn or database name is required.");
+  	return;
   }
   # Try to establish connection with data source.
-  my $user = ($self->user || $self->user('root'));
-  my $dbh = DBI->connect($dsn,$user,$self->password,
+  $self->user || $self->user($sc->recall('user')) || $self->user('root');
+  my $password = $self->password || $sc->recall('password');
+  my $dbh = DBI->connect($dsn,$self->user,$self->password,
 			 {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, Warn=>0,});
-	$self->throw("undefined database handle: check that the database exists and your connection parameters are valid") 
-	  unless defined $dbh;
   $self->dsn($dsn);
   $self->dbh($dbh);
-  $self->registry->dbh($dbh); # registry requirs db handle
-  $self->_needs_disconnect(1);
-  $self->throw("DBI::connect failed for dsn=$dsn, user=$user: ".DBI->errstr) if $dbh->errstr();
+  # cache the connection params so that we can reconnect without an AutoDB object
+  if (UNIVERSAL::isa( $self, __PACKAGE__ )) {
+    $sc->cache('dsn', $dsn);
+    $sc->cache('user', $self->user);
+  }
+  $sc->cache('password', $password) if $password;
+  if (ref($self) eq __PACKAGE__) {
+	  $self->registry->dbh($dbh); # registry requires db handle
+	  $self->_needs_disconnect(1);
+  }
+  delete $self->{user}; # so it doesn't wind up in the serialized keys or clash names with user data
+  delete $self->{dsn}; # ditto
+  $self->throw("DBI::connect failed for dsn=$dsn, user=$self->user: ".DBI->errstr) if $dbh and $dbh->errstr();
+  return $dbh;
 }
 
 sub create {
   my($self)=@_;
   my $collections = $self->registry->collections;
   if($self->_create){ # force new creation
-    $collections = $self->{diff}->{new_collections};
     $self->drop;
-    $self->registry(new Class::AutoDB::Registry(-dbh=>$self->dbh)); # reset registry
-    foreach my $collection (@$collections) {
-    	$self->registry->{name2coll}{$collection->{name}} = $collection;
-    }
   }
   $self->registry->create($collections);
+  $self->registry->put;
 }
 sub drop {
   my($self)=shift;
@@ -177,7 +171,7 @@ sub alter {
   $registry->create(@$new_collections) if @$new_collections;
   my $expanded_diffs=$diff->expanded_diffs;
   $registry->alter(@$expanded_diffs) if @$expanded_diffs;
-  $self->diff(undef);		# registries are now in synch
+  $self->diff(undef);		# registries are now in sync
 }
 
 # checks that the registry exists
@@ -190,7 +184,7 @@ sub _registry_is_saved {
 sub _fetch_registry {
   my $self=shift;
   $self->throw("there is no established database connection") unless $self->is_connected;
-  $self->registry->fetch;
+  return $self->registry || $self->registry->_retrieve;
 }
 
 # returns a Class::AutoDB::Cursor object for objects in the data store which satisfy the query
@@ -198,19 +192,23 @@ sub find {
   my($self,@query)=@_;
   my %normalized = _flatten(@query);
   my $args = new Class::AutoClass::Args(%normalized);
+  my ($cursor,$keys,@collections,@classes);
+  $args->collection([_flatten($args->collection)]);
+  $args->__search_collection(1) if scalar $args->collection->[0]; # flag that collections are specified
+  $args->class([_flatten($args->class)]);
+  $args->__search_class(1) if scalar $args->class->[0]; # flag that classes are specified
   $self->_registry_is_saved || $self->throw("registry was not found in the database");
-  if(defined $args->collection) {
-    # need to return a cursor obj
-    my $cursor;
-    my $collections = $self->registry->get;
-    my $collection_to_find = $args->collection;
-    foreach my $collection (@$collections){
-      next unless lc($collection->name) eq lc($collection_to_find);
-      my $keys = $args->getall_args;
-      # TODO: still need to pass the dbh?
-      $cursor = Class::AutoDB::Cursor->new(-collection=>$collection, -search=>$keys, -dbh=>$self->dbh);
+  if(scalar keys %$args) {
+    my %collections_to_find = map {lc($_),1} @{$args->collection};
+    if (scalar keys %collections_to_find) {
+    	# filter on existing collections
+	    foreach ($self->registry->get_collections) {
+	      push @collections, $_->name if exists $collections_to_find{lc($_->name)};
+	    }
     }
-    warn("collection \'$collection_to_find\' was not found in the database") unless $cursor;
+    $args->collection([@collections]);  
+    $cursor = Class::AutoDB::Cursor->new(-search=>$args,-dbh=>$self->dbh);
+    warn("query was not found in the database") unless $cursor;
     return $cursor ? $cursor : undef;
   }
   elsif($query[0] =~ /^select/i) {
@@ -223,6 +221,26 @@ sub find {
   }
 }
 
+# retrieve a list of all available collections
+sub get_stored_collection_list {
+	my $self=shift;
+  my $sql = qq/SELECT DISTINCT collection_name FROM $Class::AutoDB::Registry::COLLECTION_TABLE/;
+	my $res = $self->dbh->selectall_hashref($sql,1);
+	wantarray
+    ? keys %$res
+    : [ keys %$res ];
+}
+
+# retrieve a list of all available classes
+sub get_stored_class_list {
+	my $self=shift;
+  my $sql = qq/SELECT DISTINCT class_name FROM $Class::AutoDB::Registry::COLLECTION_TABLE/;
+	my $res = $self->dbh->selectall_hashref($sql,1);
+	wantarray
+    ? keys %$res
+    : [ keys %$res ];
+}
+
 # deletes search keys and serialized object from the data store for the passed
 # SmartProxy object. A list from another object which refers to the deleted object is not updated! 
 # However, attempting to access a deleted object's members (through autoclass calls) will return
@@ -232,29 +250,34 @@ sub del {
 	my ($self,$deletable)=@_;
 	my $registry = $self->registry;
 	my $dbh=$self->dbh;
-	my $table=$deletable->{__proxy_for};
+	my $tables = $deletable->{__collections};
 	my $id=$deletable->{__object_id};
 	# delete serialized object
-	$dbh->do("delete from $Class::AutoDB::Registry::OBJECT_TABLE where id=$id");
-	# delete top-level search keys
-	$dbh->do("delete from $table where object=$id");
-  # delete list search keys
-  my $listnames = $deletable->{__listname}; # easy way (might be set in SmartProxy)
-  unless ( $listnames ) { # the hard way
-    foreach my $collection ($registry->collections) {
-      next unless $collection->name eq $table;
-    	while(my($k,$v) = each %{$collection->_keys}) {
-        if($v =~ /list\(\w+\)/) {
-    		  push @$listnames, "$table"."_$k";
-    	  }
-    	}
-    }
-  }
-  foreach my $listname ( @$listnames ) {
-	  $dbh->do("delete from $listname where object=$id");
-	  # deleted list names are cached for Class::AutoDB::SmartProxy::is_deleted
-    $dc->cache($id,1);
-  }
+	$dbh->do("delete from $Class::AutoDB::Registry::OBJECT_TABLE where oid=$id");
+	foreach my $table (_flatten($tables)) {
+		# delete top-level search keys (may exist in >1 collection)
+		$dbh->do("delete from $table where oid=$id");
+		# delete oid from the collection_link table;
+		$dbh->do(qq/delete from $Class::AutoDB::Registry::COLLECTION_TABLE where collection_name="$table" and oid="$id"/);
+	  # delete list search keys
+	  my $listnames = $deletable->{__listname}; # easy way (will be set if already persisted)
+	  unless ( $listnames ) { # the hard way
+	    foreach my $collection ($registry->collections) {
+	      next unless $collection and $collection->name eq $table;
+	    	while(my($k,$v) = each %{$collection->_keys}) {
+	        if($v =~ /list\(\w+\)/) {
+	    		  push @$listnames, "$table"."_$k";
+	    	  }
+	    	}
+	    }
+	  }
+	  foreach my $listname ( @$listnames ) {
+		  $dbh->do("delete from $listname where oid=$id");
+		  # deletions are cached for Class::AutoDB::SmartProxy::is_deleted
+	    $dc->cache($id,1);
+	  }
+	}
+  return 1;
 }
 
 sub is_query {
@@ -267,7 +290,6 @@ sub is_connected {
 
 # flattens refs into a list
 sub _flatten {  
-  my @result = 
   'HASH' eq ref($_[0]) ? %{$_[0]} :
     'ARRAY' eq ref($_[0]) ?  @{$_[0]} :
     @_;
@@ -398,13 +420,12 @@ The 'find' method also allows almost raw SQL queries with the caveat
 that these are very closely tied to the implementation and will not be
 portable if we ever change the implementation. ]
 
-[ not yet implemented:
 A collection can contain objects from many different classes.  (This
 is Perl after all -- what else would you expect ??!!) To limit a
 search to objects of a specific class, you can pass a 'class'
 parameter to find.  In fact, you can search for objects of a given
 class independent of the collection by specifying a 'class' parameter
-without a 'collection'. ]
+without a 'collection'.
 
 When you create an object, the system automatically stores it in the
 database at an 'appropriate' time, presently just before Perl destroys
@@ -435,7 +456,7 @@ More typically, you set %AUTODB to a HASH of the form
     -keys=>qq(name string, sex string, friends list(object)));
 
   -collection is the name of the collection that will be used to store
-   objects of your class, and 
+   objects of your class (class and collection names must be <= 255 characters), and 
   -keys is a string that defines the search keys that will be defined
    for the class.
 
@@ -472,12 +493,10 @@ numeric.  See Persistence Model below.
 The types 'object' and 'list(object)' only work on objects whose
 persistence is managed by our Persistence mechanisms.
 
-[ not yet implemented: 
 The 'collection' values may also be an array of collections (and may
 be called 'collections') in which case the object is stored in all the
-collections. ]
+collections.
 
-[ not yet implemented:
 A subclass need not define %AUTODB, but may instead rely on the
 value set by its super-classes. If the subclass does define
 %AUTODB, its values are 'added' to those of its super-classes.
@@ -485,7 +504,7 @@ Thus, if the suclass uses a different collection than its super-class,
 the object is stored in both.  It is an error for a subclass to define
 the type of a search key differently than its super-classes.  It is
 also an error for a subclass to inherit a search key from multiple
-super-classes with different types  We hope this situation is rare! ]
+super-classes with different types  We hope this situation is rare!
 
 [ not yet implemented:
 Technically, %AUTODB is a parameter list for the register
@@ -919,6 +938,13 @@ $object->xxx($new_value); To clear it, say $object->xxx(undef);
            registry.  Used by alter
  Access  : read-only
 
+=head2 Object removal
+ Title   : del -OR- delete
+ Usage   : $autodb->del($joe)
+ Function: delete object from the data store
+ Args    : the object to delete
+ Returns : true if deleted
+
 =head2 Getting status information about objects
 
  Title   : is_cursor
@@ -938,6 +964,18 @@ $object->xxx($new_value); To clear it, say $object->xxx(undef);
  Function: Test whether a database is open for object
  Args    : None
  Returns : true value if query has been run, else false
+ 
+ Title   : get_stored_collection_list
+ Usage   : $self->get_stored_collection_list()
+ Function: retrieve a list of all persisted collections
+ Args    : None
+ Returns : list or listref of collection names
+ 
+ Title   : get_stored_class_list
+ Usage   : $self->get_stored_class_list()
+ Function: retrieve a list of all persisted classes
+ Args    : None
+ Returns : list or listref of class names
 
 =head2 The registry and schema modification
 

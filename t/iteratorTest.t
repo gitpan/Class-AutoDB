@@ -22,7 +22,7 @@ SKIP: {
   
   # create and immediately destroy (so that objects are persisted)
   for (1..3) {
-    Scalar::Util::weaken( Thing->new(-name=>"friend$_", -sex=>'female' ) );
+    Thing->new(-name=>"friend$_", -sex=>'female' )->store;
   }
      
   # verify the collections

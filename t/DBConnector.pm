@@ -83,7 +83,7 @@ sub _init_self {
 sub _createDB {
   my $DB_DRIVER = "DBI:mysql:server=$DB_SERVER;database=";
   my $dbh = DBI->connect("$DB_DRIVER", "$DB_USER", "$DB_PASS")
-    or die "$DBI::errstr : perhaps you should alter $0's connection parameters";
+    or die "$DBI::errstr : perhaps you should alter $0's connection parameters (remove $noConnectionFile if it exist before retrying)";
   $dbh->do("create database $DB_DATABASE");
   $dbh->disconnect();
 }
@@ -163,6 +163,5 @@ DESTROY  {
          $dbh->disconnect();
 	   }
 }
-     
 
 1;

@@ -5,7 +5,23 @@ use Class::AutoDB::TypeMap;
 use Class::AutoDB::Collection;
 use Class::AutoDB::Registration;
 use Error qw(:try);
-use Data::Dumper; # only for testing
+use DBConnector;
+use Person;
+use TestAutoDBOutside_1;
+use Class::AutoDB;
+
+my $DBC = new DBConnector;
+my $dbh = $DBC->getDBHandle;
+
+SKIP: {
+	skip "! Cannot test without a database connection - please adjust DBConnector.pm's connection parameters and \'make test\' again", 1 unless $DBC->can_connect;
+	
+my $autodb = Class::AutoDB->new(
+                        -dsn=>"DBI:$DBConnector::DB_NAME:database=$DBConnector::DB_DATABASE;host=$DBConnector::DB_SERVER",
+                        -user=>$DBConnector::DB_USER,
+                        -password=>$DBConnector::DB_PASS
+                      ); 
+
 
 my $exception; # $exception string
 
@@ -92,11 +108,9 @@ is($tm_init->is_valid('float',$nums[0]), 1);
 is($tm_init->is_valid('float',$nums[1]), 1);
 isnt($tm_init->is_valid('float',$nums[3]), 1, 'alphas are rejected for double checks');
 # check objects - only inside objects are accepted (can't generate search keys for others)
-use Person;
 my $inside = new Person(-name=>'white spy',-sex=>'male');
 is($tm_init->is_inside($inside),1);
 is($tm_init->is_outside($inside),0);
-use TestAutoDBOutside_1;
 my $outside = new TestAutoDBOutside_1;
 is($tm_init->is_inside($outside),0);
 is($tm_init->is_outside($outside),1);
@@ -111,8 +125,6 @@ is($tm_init->is_inside($scalarref),0);
 is($tm_init->is_outside($scalarref),0);
 is($tm_init->is_inside('blah'),0);
 is($tm_init->is_outside('blah'),0);
-
-exit;
 
 isnt($tm_init->is_valid('object',$scalarref), 1, 'checking scalar ref as object type');
 isnt($tm_init->is_valid('object',$aryref), 1, 'checking array ref as object type');
@@ -228,13 +240,13 @@ is(scalar @{$tm_init->clean('list(mixed)',[$inside, $aryref])}, 2);
 is($tm_init->is_valid('list(mixed)',$list_ii), 1);
 is(scalar @{$tm_init->clean('list(mixed)',$list_ii)}, 2);
 
-isnt($tm_init->is_valid('list(mixed)',$list_o), 1);
+is($tm_init->is_valid('list(mixed)',$list_o), 1);
 is($tm_init->clean('list(mixed)',$list_o), undef);
 
-isnt($tm_init->is_valid('list(mixed)',$list_so), 1);
+is($tm_init->is_valid('list(mixed)',$list_so), 1);
 is(scalar @{$tm_init->clean('list(mixed)',$list_so)}, 1);
 
-isnt($tm_init->is_valid('list(mixed)',$list_io), 1);
+is($tm_init->is_valid('list(mixed)',$list_io), 1);
 is(scalar @{$tm_init->clean('list(mixed)',$list_io)}, 1);
-
+}
 1;

@@ -9,7 +9,7 @@ use DBConnector;
 @AUTO_ATTRIBUTES=qw(name location attending sites);
 @OTHER_ATTRIBUTES=qw();
 %SYNONYMS=();
-%AUTODB=(-collection=>__PACKAGE__,
+%AUTODB=(-collections=>['Place', 'Thing'],
 	   -keys=>qq(name string, location string, attending object, sites list(string)),
 	  );
 Class::AutoClass::declare(__PACKAGE__);

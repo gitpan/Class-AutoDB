@@ -6,13 +6,25 @@ use Class::AutoDB::RegistryDiff;
 use Class::AutoDB::Registration;
 use DBI;
 use IO::Scalar;
+use Error qw(:try);
 use strict;
-use Data::Dumper; ## only for debugging
+
+# override StoreCache's cache() method
+use base qw(Class::AutoDB::StoreCache);
 
 use vars qw($REGISTRY $REGISTRY_OID $OBJECT_TABLE $OBJECT_COLUMNS);
 $REGISTRY_OID=1;		# object id for registry
 $OBJECT_TABLE='_AutoDB';	# default for Object table
 $OBJECT_COLUMNS=qq(id int not null auto_increment, primary key (id), object longblob);
+
+{
+  no warnings;
+	sub Class::AutoDB::StoreCache::cache {
+	  my $self=shift;
+	  my($key,$store)=@_;
+	  $self->Class::AutoDB::Cache::cache(@_);
+	}
+}
 
 # setup methods 
 my %empty=(-collection=>'empty',-keys=>qq());
@@ -24,6 +36,7 @@ my %bad2=(-collection=>'bad',-keys=>qq(b string, a object, d string));
 my %expand1=(-collection=>'expand',-keys=>qq(a string, b string, c string));
 my %expand2=(-collection=>'expand',-keys=>qq(b string, c string, d string));
 
+# override cache() method so that we can test through to Registry's guts
 my $null=make_registry();
 my $empty=make_registry(\%empty);
 my $empty_a=make_registry(\%empty,\%a);

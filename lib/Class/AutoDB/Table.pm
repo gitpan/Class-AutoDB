@@ -48,11 +48,13 @@ sub schema {
 	      $self->throw("Invalid data type for key $key: $type. Should be one of: ".join(' ',@TYPES));
       push(@columns,"$key $sql_type");
     }
-    # make sure that the object column size >= that of the id in the Registry
-    unshift @columns, $inner_type?
-      ('object varchar(15) not null') :
-      ('object varchar(15) not null, primary key (object)');
-    $sql=@columns? "create table $name \(".join(',',@columns)."\)": '';
+    if(@columns) {
+	    # lists are lookup tables, they can't have a unique key
+	    unshift @columns, $inner_type?
+	      ('oid varchar(15) not null') :
+	      ('oid varchar(15) not null, primary key (oid)');
+	    $sql="create table $name \(".join(',',@columns)."\)";
+    }
   };
   $code eq 'drop' and do {
     $sql="drop table if exists $name";

@@ -44,6 +44,7 @@ SKIP: {
   for ( 0..@$peeps-1 ) {
     ok($peeps->[$_]->[0] =~ qq[$jid|$bid|$mid], "test oject id");
     ok($peeps->[$_]->[1] =~ qq[Joe|Bill|Mary], "test oject names");
-    ok($peeps->[$_]->[2] =~ qq[male|female], "test oject genders");
+    is($peeps->[$_]->[2], undef, "alisas not set (expected)");
+    ok($peeps->[$_]->[3] =~ qq[male|female], "test oject genders");
   }
 }

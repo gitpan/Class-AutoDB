@@ -29,7 +29,7 @@ SKIP: {
    my(%people);
   
   # get names and oid's
-  my $rows = $dbh->selectall_arrayref('select object,name from Person');
+  my $rows = $dbh->selectall_arrayref('select oid,name from Person');
   for ( 0..@$rows-1 ) {
     my ($name,$id) = undef;
     $people{ lc($rows->[$_]->[1]) } = $rows->[$_]->[0];
@@ -38,11 +38,11 @@ SKIP: {
   ## test Person search keys
   my($dawgs,$thaw,$list);
   # Joe no has friends (none that the data store knows about)
-  my $j = $dbh->selectall_arrayref("select * from Person where object=$people{joe}");
+  my $j = $dbh->selectall_arrayref("select * from Person where oid=$people{joe}");
   ok($j->[$_]->[0] == $people{joe});
   ok($j->[$_]->[1] eq q[Joe]);
-  ok($j->[$_]->[2] eq q[male]);
-  $dawgs = $dbh->selectall_arrayref("select friends from Person_friends where object=$people{joe}");
+  ok($j->[$_]->[3] eq q[male]);
+  $dawgs = $dbh->selectall_arrayref("select friends from Person_friends where oid=$people{joe}");
   $list = $dawgs->[0]->[0];
   eval $list; # sets the $thaw handle from list reference
   is($thaw, undef, 'object persisted correctly at store() time');
@@ -52,16 +52,16 @@ SKIP: {
   ($dawgs,$thaw,$list) = undef;
   
   # Mary has friends Joe, Bill
-  my $m = $dbh->selectall_arrayref("select * from Person where object=$people{mary}");
+  my $m = $dbh->selectall_arrayref("select * from Person where oid=$people{mary}");
   ok($m->[$_]->[0] == $people{mary});
   ok($m->[$_]->[1] eq q[Mary]);
-  ok($m->[$_]->[2] eq q[female]);
-  $dawgs = $dbh->selectall_arrayref("select friends from Person_friends where object=$people{mary}");
+  ok($m->[$_]->[3] eq q[female]);
+  $dawgs = $dbh->selectall_arrayref("select friends from Person_friends where oid=$people{mary}");
   is($dawgs->[0]->[0], $people{joe});
   is($dawgs->[1]->[0], $people{bill});
   # test persisted object's list
   ($thaw) = undef;
-  my $m_obj = $dbh->selectall_arrayref("select object from _AutoDB where id=$people{mary}");
+  my $m_obj = $dbh->selectall_arrayref("select object from _AutoDB where oid=$people{mary}");
   eval $m_obj->[0]->[0]; # sets the $thaw handle from object reference
   is(scalar @{$thaw->{friends}}, 2, 'persisted object\'s list has anticipated number of list items' );
   foreach my $item (@{$thaw->{friends}}) {
@@ -71,16 +71,16 @@ SKIP: {
   ($dawgs,$thaw,$list) = undef;
   
   # Bill has friends Joe, Mary
-  my $b = $dbh->selectall_arrayref("select * from Person where object=$people{bill}");
+  my $b = $dbh->selectall_arrayref("select * from Person where oid=$people{bill}");
   ok($b->[$_]->[0] == $people{bill});
   ok($b->[$_]->[1] eq q[Bill]);
-  ok($b->[$_]->[2] eq q[male]);
-  $dawgs = $dbh->selectall_arrayref("select friends from Person_friends where object=$people{bill}");
+  ok($b->[$_]->[3] eq q[male]);
+  $dawgs = $dbh->selectall_arrayref("select friends from Person_friends where oid=$people{bill}");
   is($dawgs->[0]->[0], $people{joe});
   is($dawgs->[1]->[0], $people{mary});
   # test persisted object's list
   ($thaw) = undef;
-  my $b_obj = $dbh->selectall_arrayref("select object from _AutoDB where id=$people{bill}");
+  my $b_obj = $dbh->selectall_arrayref("select object from _AutoDB where oid=$people{bill}");
   eval $b_obj->[0]->[0]; # sets the $thaw handle from object reference
   is(scalar @{$thaw->{friends}}, 3, 'persisted object\'s list has anticipated number of list items' );
   foreach my $item (@{$thaw->{friends}}) {

@@ -33,7 +33,7 @@ SKIP: {
   
   for(1..MAX){
     # create objects in memory and populate the collection
-    my $thingy=TestAutoDB_1->new(-this=>1, -that=>'thingy1', -other=>["one","two"]);
+    my $thingy=TestAutoDB_1->new(-this=>1, -that=>'thingy1', -other=>["one","two"])->store;
   }
   
   my $count = $dbh->selectrow_array("select count(*) from $OBJECT_TABLE");

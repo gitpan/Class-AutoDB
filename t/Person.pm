@@ -12,7 +12,7 @@ use Class::AutoClass;
 %SYNONYMS=();
 %AUTODB=(
 -collection=>'Person',
--keys=>qq(name string, sex string, hobbies list(string), friends list(mixed)));
+-keys=>qq(name string, sex string, alias string, hobbies list(string), friends list(mixed)));
 Class::AutoClass::declare(__PACKAGE__);
 
 1;

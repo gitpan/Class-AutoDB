@@ -4,10 +4,11 @@ use DBConnector;
 use Class::AutoDB;
 use Person;
 use Thing;
+use Place;
 use Test::More qw/no_plan/;
 use Scalar::Util;
 
-my $DBC = new DBConnector();
+my $DBC = new DBConnector(noclean=>0);
 my $dbh = $DBC->getDBHandle;
 
 ## note: 'del' and 'delete' are synonymous methods
@@ -28,11 +29,11 @@ SKIP: {
   $lucy = Person->new(-name=>'Lucy', -sex=>'female',-friends=>[$ethel],-hobbies=>['getting into trouble'] );
   $lucy->store; # ditto
   
-  # create and immediately destroy (so that objects are persisted)
+  # create and immediately store
   for (1..3) {
-    Scalar::Util::weaken( Thing->new(-name=>"friend$_", -sex=>'female', -friends=>[$lucy,$ethel] ) );
+    Thing->new(-name=>"friend$_", -sex=>'female', -friends=>[$lucy,$ethel] )->store;
   }
-
+  
   # verify the collections
   $Tcursor = $autodb->find(-collection=>'Thing');
   is($Tcursor->count,3);
@@ -52,7 +53,7 @@ SKIP: {
   }
   # verify Person deletions
   is($Pcursor->count,0);
-  
+
   ## make sure that search keys and serialized objects are really cleaned from the data store
   # test serialized objects -  only type 'Thing' should remain
   my $objs = $dbh->selectall_arrayref('select * from _AutoDB');
@@ -61,9 +62,9 @@ SKIP: {
     next unless $objs->[$_]->[0] =~ /[0-9]+/; # only select objects with oid's
     $obj = $objs->[$_]->[1];
     eval $obj; # sets the $thaw handle from list reference
-    is(lc($thaw->{__proxy_for}), 'thing');
+    is(lc($thaw->{_CLASS}), 'thing');
   }
-  
+
   # test Person top-level search keys
   my $peeps = $dbh->selectall_arrayref('select * from Person');
   is($peeps->[0], undef, 'all Person top-level search keys are removed from the data store');
@@ -73,6 +74,7 @@ SKIP: {
   is($peeps_list->[0], undef, 'all Person list search keys are removed from the data store');
   
   $Tcursor->reset;
+
   # iterate over Tcursor collection
   while (my $thing = $Tcursor->get_next) {
     is(scalar @{$thing->friends}, 2, 'you can still see deleted objects through their referant\'s lists' );
@@ -93,4 +95,42 @@ SKIP: {
     is($thing->friends->[0]->is_del,1); # the only way to access Lucy
     is($thing->friends->[1]->is_deleted,1); # the only way to access Ethel
   }
+  
+  $Tcursor->reset;
+  # delete the Thing entries
+  while (my $t = $Tcursor->get_next) {
+    $autodb->delete($t);
+  }
+  is($Tcursor->count,0);
+  # verify that delting an object which exists in > 1 collection deletes from only the specified object
+  for (1..3) {
+    Place->new(-name=>"place$_", -location=>"near $_", -sites=>['mountains','streams'])->store;
+  }
+  # create independent Thing objects
+    for (1..3) {
+    Thing->new(-name=>"another_friend$_", -sex=>'unknown')->store;
+  }
+  # Place objects belong to both collections
+  my $Place_cursor = $autodb->find(-collection=>'Place', -class=>'Place'); # select only Place objects from Place collection
+  $Tcursor = $autodb->find(-collection=>'Thing');
+  is($Place_cursor->count,3);
+  is($Tcursor->count,6);
+  
+  while (my $place = $Place_cursor->get_next) {
+    ok($place->name);
+    ok($place->location);
+    ok($place->sites);
+  }
+  while (my $thingy = $Tcursor->get_next) {
+    ok($thingy->name);
+  }
+  $Place_cursor->reset;
+  $Tcursor->reset;
+  
+  while (my $p = $Place_cursor->get_next) {
+    $autodb->delete($p);
+  }
+  
+  is($Place_cursor->count, 0);
+  is($Tcursor->count, 3); # independent Thing collection is uneffected
 }

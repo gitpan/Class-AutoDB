@@ -1,7 +1,6 @@
 package Class::AutoDB::RegistryDiff;
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
 use strict;
-use Data::Dumper;
 use Class::AutoClass;
 use Class::AutoClass::Args;
 use Class::AutoDB::Registry;
@@ -21,7 +20,9 @@ sub _init_self {
   my($self,$class,$args)=@_;
   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
   my($baseline,$other)=$self->get(qw(baseline other));
-  $self->throw("RegistryDiff needs two non-empty registries") unless ($baseline and $other);
+  $self->throw("RegistryDiff needs two non-empty registries") 
+    unless (UNIVERSAL::isa($baseline, 'Class::AutoDB::Registry') and 
+            UNIVERSAL::isa($other, 'Class::AutoDB::Registry'));
   my($baseline_only,$new,$equivalent,$sub,$super,$expanded,$inconsistent);
   my $baseline_collections=$baseline->collections;
   for my $collection (@$baseline_collections) {

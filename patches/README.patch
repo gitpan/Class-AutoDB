@@ -1,5 +1,5 @@
 These instructions are reletive to the Class::AutoDB installation directory:
-# get the Data-Dumper-2.121 distribution
+# get the Data-Dumper-2.121 distribution (you will need to patch the Data::Dumper source code)
 cpan > get Data::Dumper
 cp -r patches Data-Dumper-2.121 directory (usually ~/.cpan/build/Data-Dumper-2.121)
 cd Data-Dumper-2.121 directory

@@ -5,10 +5,9 @@ use Scalar::Util;
 use DBConnector;
 use Class::AutoDB;
 use Person;
-use lib qw(/users/ccavnor/perllibs/lib);
 no warnings; ## suppress unititialized varibale warnings
 
-my $DBC = new DBConnector();
+my $DBC = new DBConnector;
 my $dbh = $DBC->getDBHandle;
 
 ## the testStorageStatesX (where X is an integer) series of tests puts AutoDB through a bunch of storage scenarios, 
@@ -25,19 +24,18 @@ SKIP: {
                           -user=>$DBConnector::DB_USER,
                           -password=>$DBConnector::DB_PASS
                         ); 
-                        
-  my $joe=new Person(-name=>'Joe',-sex=>'male');
-  my $mary=new Person(-name=>'Mary',-sex=>'female');
-  my $bill=new Person(-name=>'Bill',-sex=>'male');
   
-  my $jid = $joe->{__object_id};
-  my $mid = $mary->{__object_id};
-  my $bid = $bill->{__object_id};
-
-  # only necessary for testing (we force implicit collection by --refcount to zero)
-  Scalar::Util::weaken($joe);
-  Scalar::Util::weaken($mary);
-  Scalar::Util::weaken($bill);
+  my(%people);
+  # get names and oid's
+  my $rows = $dbh->selectall_arrayref('select oid,name from Person');
+  for ( 0..@$rows-1 ) {
+    my ($name,$id) = undef;
+    $people{ lc($rows->[$_]->[1]) } = $rows->[$_]->[0];
+  }
+  
+  my $jid = $people{joe};
+  my $mid = $people{mary};
+  my $bid = $people{bill};
 
 # compare inserts with expected results
   
@@ -48,7 +46,7 @@ SKIP: {
     next unless $objs->[$_]->[0] =~ /[0-9]+/; # only select objects with oid's
     $obj = $objs->[$_]->[1];
     eval $obj; # sets the $thaw handle from list reference
-    is(lc($thaw->{__proxy_for}), 'person');
+    is(lc($thaw->{_CLASS}), 'person');
   }
   
   # test person search keys
@@ -56,6 +54,7 @@ SKIP: {
   for ( 0..@$peeps-1 ) {
     ok($peeps->[$_]->[0] =~ qq[$jid|$bid|$mid], "test oject id");
     ok($peeps->[$_]->[1] =~ qq[Joe|Bill|Mary], "test oject name");
-    ok($peeps->[$_]->[2] =~ qq[male|female], "test oject gender");
+    ok($peeps->[$_]->[3] =~ qq[male|female], "test oject gender");
   }
 }
+1;

@@ -39,10 +39,7 @@ SKIP: {
 
   # explicitly store mary - implicitly store bill, joe
   $mary->store;
-  Scalar::Util::weaken($bill);
-  Scalar::Util::weaken($joe);
   
   is(1,1); #just to quiet the test harness ;)
-  sleep 1; # give I/O time to catch up before test harness pulls our handle
 }
-1; # required to get test harness to lose handle to test objects (not being promptly destroyed). This does not happen with manual runs
+1;

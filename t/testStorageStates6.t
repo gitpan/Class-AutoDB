@@ -11,7 +11,7 @@ use TestAutoDBOutside_2;
 use Error qw(:try);
 no warnings; ## suppress unititialized variable warnings
 
-my $DBC = new DBConnector();
+my $DBC = new DBConnector(noclean=>0);
 my $dbh = $DBC->getDBHandle;
 
 ## the testStorageStatesX (where X is an integer) series of tests puts AutoDB through a bunch of storage scenarios, 
@@ -34,15 +34,6 @@ SKIP: {
   my $joe=new Person(-name=>'Joe',-sex=>'male');
   my $eddy=new Person(-name=>'Eddy',-sex=>'male');
   
-  my $camping = new Place( -name=>'Shi Shi Beach',
-                           -location=>'Olympic Peninsula',
-                           -attending=>$eddy,
-                           -sites=>['seastacks', 'surf', 'sand']);
-
-  my $hiking = new Place( -name=>'Castle Ridge Trail',
-                          -location=>'Mt. St. Helens National Volcanic Monument',
-                          -sites=>['blast zone', 'west slopes of Mount St. Helens', 'South Fork Toutle River valley']);
-
   # init outside objects
   my $out1 = new TestAutoDBOutside_1;
   $out1->this('siht');
@@ -69,7 +60,7 @@ SKIP: {
   my(%people);
   
   # get names and oid's
-  my $rows = $dbh->selectall_arrayref('select object,name from Person');
+  my $rows = $dbh->selectall_arrayref('select oid,name from Person');
   for ( 0..@$rows-1 ) {
     my ($name,$id) = undef;
     $people{ lc($rows->[$_]->[1]) } = $rows->[$_]->[0];
@@ -77,18 +68,18 @@ SKIP: {
   
   # joe
   my($dawgs,$thaw,$list);
-  my $j = $dbh->selectall_arrayref("select * from Person where object=$people{joe}");
+  my $j = $dbh->selectall_arrayref("select * from Person where oid=$people{joe}");
   ok($j->[$_]->[0] == $people{joe});
   ok($j->[$_]->[1] eq q[Joe]);
-  ok($j->[$_]->[2] eq q[male]);
+  ok($j->[$_]->[3] eq q[male]);
   
   # test persisted object's list
-  $dawgs = $dbh->selectall_arrayref("select friends from Person_friends where object=$people{joe}");
+  $dawgs = $dbh->selectall_arrayref("select friends from Person_friends where oid=$people{joe}");
   is($dawgs->[0]->[0], $people{eddy});
   is($dawgs->[2]->[0], undef, "outside object not added, as expected");
   # test persisted object
   ($thaw) = undef;
-  my $j_obj = $dbh->selectall_arrayref("select object from _AutoDB where id=$people{joe}");
+  my $j_obj = $dbh->selectall_arrayref("select object from _AutoDB where oid=$people{joe}");
   eval $j_obj->[0]->[0]; # sets the $thaw handle from object reference
   is(scalar @{$thaw->{friends}}, 2, 'persisted object\'s list has anticipated number of list items' );
   # check that no list item is undef
@@ -99,21 +90,22 @@ SKIP: {
   ($dawgs,$thaw,$list) = undef;
   
   # eddy
-  my $e = $dbh->selectall_arrayref("select * from Person where object=$people{eddy}");
+  my $e = $dbh->selectall_arrayref("select * from Person where oid=$people{eddy}");
   ok($e->[$_]->[0] == $people{eddy});
   ok($e->[$_]->[1] eq q[Eddy]);
-  ok($e->[$_]->[2] eq q[male]);
+  ok($e->[$_]->[3] eq q[male]);
   # test persisted object's list
-  $dawgs = $dbh->selectall_arrayref("select friends from Person_friends where object=$people{eddy}");
-  is($dawgs->[0]->[0], $people{joe});
-  is($dawgs->[1]->[0], 'string thing', "string is added");
-  is($dawgs->[2]->[0], undef, "outside object not added, as expected");
+  $dawgs = $dbh->selectall_hashref(qq/select friends from Person_friends where oid=$people{eddy}/,1);
+  is(scalar keys %$dawgs, 2);
+  ok(defined $dawgs->{$people{joe}});
+  ok(defined $dawgs->{'string thing'});
   # test persisted object
   ($thaw) = undef;
-  my $b_obj = $dbh->selectall_arrayref("select object from _AutoDB where id=$people{eddy}");
+  my $b_obj = $dbh->selectall_arrayref("select object from _AutoDB where oid=$people{eddy}");
   eval $b_obj->[0]->[0]; # sets the $thaw handle from object reference
   is(scalar @{$thaw->{friends}}, 3, 'persisted object\'s list has anticipated number of list items' );
   foreach my $item (@{$thaw->{friends}}) {
     isnt($item,undef,'list item is defined');
   }
 }
+1;

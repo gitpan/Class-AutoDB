@@ -8,7 +8,7 @@ sub cache {
   my($self,$key,$store)=@_;
   $key = ref($key) || $key;
   return unless defined $store;
-  $self->{storage}{$key} = $store
+  $self->{storage}{$key} = $store if $key;
 }
 sub recall {
  my($self,$key)=@_;

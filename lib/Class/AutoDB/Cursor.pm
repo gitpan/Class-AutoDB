@@ -1,118 +1,154 @@
 package Class::AutoDB::Cursor;
-
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
 use strict;
 use Class::AutoClass;
 use Class::AutoDB::Registry;
-@ISA = qw(Class::AutoClass); # AutoClass must be first!!
-
-  @AUTO_ATTRIBUTES=qw(args);
-  @OTHER_ATTRIBUTES=qw();
-  %SYNONYMS=();
-  Class::AutoClass::declare(__PACKAGE__);
+use Data::Dumper;
+@ISA              = qw(Class::AutoClass);      # AutoClass must be first!!
+@AUTO_ATTRIBUTES  = qw(args _count objects);
+@OTHER_ATTRIBUTES = qw();
+%SYNONYMS         = ();
+Class::AutoClass::declare(__PACKAGE__);
 
 sub _init_self {
-  my($self,$class,$args)=@_;
-  return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
-  $self->args($args);
-  $self->_reconstitute($args);
-  return $self;
+	my ( $self, $class, $args ) = @_;
+	return unless $class eq __PACKAGE__;         # to prevent subclasses from re-running this
+	$self->args($args);
+	$self->_reconstitute($args);
+	return $self;
 }
 
 # reconstitute the object with its stored data -
 # $data param contains a collection object and, optionally, search keys
 sub _reconstitute {
-  my($self,$data) = @_;
-  my @objects;
+	my ( $self, $data ) = @_;
+	my @objects;
+	# if collection(s) were given, they will be iterated over - else ALL collections will be
+	my $collections = $data->search->collection;
+	my $classes     = $data->search->class;
+	$self->throw(
+					 "Class::AutoDB::Cursor requires a Class::AutoDB::Collection object and your search keys")
+		unless $collections;
+	my (
+		%searchable_keys,           # user-specified keys to search
+		%searchable_collections,    # user-specified collections to search
+		%searchable_classes,        # user-specified classes to search
+		%collection,								# collection objects for searched collections
+		$sql,                       #  SQL query string
+		%oids,                      # unique oid's
+		$ary_ref
+		 );
 
-  $self->throw("Class::AutoDB::Cursor requires a Class::AutoDB::Collection object and your search keys")
-    unless $data->{collection};
+	# get a unique list of all search params
+	map { $searchable_classes{$_}++ } @$classes;
+	map { $searchable_collections{$_}++ } @$collections;
 
-  my (@searchkeys,%searchable,$sql);
-  my $collection_name = $data->collection->name;
-  my $listname;
-  while (my($k,$v)=each %{$data->collection->_keys}) {
-    if ( $v =~ /^list/ ) { $listname=$k; last }
-  }
-  ###
-  ### get all the records that satisfy the query params for the collection
-  ###
-  if(exists $data->{search} && exists $data->search->{collection}) {
-    @searchkeys = keys %{$data->search};
-  }
-  foreach (@searchkeys) {
-	    next if $_ eq 'collection';
-	    unless($data->collection->_keys->{$_}) {
-	      $self->warn("can't find key named \'$_\' in $collection_name, ignoring it");
-	      next;
-	    }
-	    $searchable{$_} = $data->search->{$_};
-  }
-  $sql = "SELECT object FROM $collection_name";
-  my $arg_cnt = (scalar keys %searchable);
-  
-  # AND together the query attributes
-  if(scalar keys %searchable) {
-    $sql .= " WHERE ";
-    while(my($k,$v) = each %searchable) {
-      $arg_cnt--;
-      $sql .= " $k = \'$v\' ";
-      $sql .= " AND " if $arg_cnt;
-    }
-  }
-  
-  # grab oid from search params
-  my $ary_ref;
-  eval{ $ary_ref = $data->{dbh}->selectall_arrayref($sql) };
-  $self->warn("Query: <$sql> produced no results") and return unless scalar $ary_ref;
-  
-  ### reconstitution - create an instance of the stored object
-  foreach (@$ary_ref) {
-    my $oid = $_->[0];
-    my ($fetched,$thaw);
-    $sql = qq/select object from $Class::AutoDB::Registry::OBJECT_TABLE where id=$oid/;
-    eval{ $fetched = $data->{dbh}->selectall_arrayref($sql) };
-    $self->warn("Query: <$sql> produced no results") and return unless $fetched->[0];
-    eval $fetched->[0]->[0]; # sets thaw
-    push @objects, bless $thaw, $thaw->{__proxy_for};
-  }
-  
-  $self->{__count} = scalar @$ary_ref;
-  $self->{objects} =  \@objects;
+	# filter for existing keys (ignore class and collection args)
+	foreach ( keys %{ $data->search } ) {
+		next if $_ eq 'collection';
+		next if $_ eq 'class';
+		next if $_ =~ /__search/;    # search flags
+		$searchable_keys{$_} = $data->search->{$_};
+	}
+	$sql = qq/SELECT DISTINCT * FROM 
+  		                $Class::AutoDB::Registry::COLLECTION_TABLE WHERE/;
+	if ( my $arg_cnt = ( scalar keys %searchable_collections ) ) {
+		foreach ( keys %searchable_collections ) {
+			$arg_cnt--;
+			$sql .= qq/ collection_name="$_" /;
+			$sql .= " OR " if $arg_cnt;
+		}
+	}
+	if ( my $arg_cnt = ( scalar keys %searchable_classes ) ) {    # class search
+		$sql .= ' AND (' if $sql =~ /collection_name/;
+		foreach ( keys %searchable_classes ) {
+			$arg_cnt--;
+			$sql .= qq/ class_name="$_" /;
+			$sql .= " OR " if $arg_cnt;
+		}
+		$sql .= ')' if $sql =~ /collection_name/;
+	}
+	# now query for attributes (other than class,collection), if any
+	if ( scalar keys %searchable_keys ) {
+		my $valid_rows = $data->{dbh}->selectall_hashref( $sql, 2 );    # key on collection_name
+		my ($registry) = $data->{dbh}->selectrow_array(
+		   qq(SELECT object FROM 
+		   $Class::AutoDB::Registry::OBJECT_TABLE WHERE 
+		   oid="$Class::AutoDB::Registry::REGISTRY_OID"));
+    my $thaw;
+    eval $registry;    # sets $thaw
+		foreach my $coll (keys %$valid_rows) {
+		   while(my($k,$v) = each %{$thaw->{name2coll}->{$coll}->{_keys}}) {
+		     if($v =~ /list/) {
+		       $collection{$coll .  '_' . $k}++; # add list name to %collection
+		     } else {
+		       $collection{$coll}++;
+		     }
+		   }
+		}
+		foreach my $rowref ( keys %collection ) {
+			my $sql = qq/SELECT DISTINCT oid FROM 
+  		                 $rowref WHERE /;
+			my $arg_cnt = scalar keys %searchable_keys;
+			while ( my ( $k, $v ) = each %searchable_keys ) {
+				$sql .= " $k = \'$v\' ";
+				$sql .= " AND " if --$arg_cnt;
+			} 				
+				$ary_ref = $data->{dbh}->selectall_arrayref($sql);
+				last if $ary_ref;
+		}
+	} else { # no searchable attributes
+		$ary_ref = $data->{dbh}->selectall_arrayref($sql);
+	}
+	# reconstitution - create an instance of the stored object
+	foreach (@$ary_ref) {
+		my $oid = $_->[0];
+		next if $oids{$oid};
+		$oids{ $_->[0] }++;
+		my ( $fetched, $thaw );
+		$sql = qq/select object from $Class::AutoDB::Registry::OBJECT_TABLE where oid=$oid/;
+		eval { $fetched = $data->{dbh}->selectall_arrayref($sql) };
+		next unless $fetched->[0];
+		eval $fetched->[0]->[0];    # sets thaw
+		push @objects, bless $thaw, $thaw->{_CLASS};
+	}
+	$self->_count( scalar @objects );
+	$self->objects( \@objects );
 }
 
 # return the number of objects in the retrieved collection
 sub count {
-  my $self=shift;
-  $self->reset;
-  return defined $self->{objects} ? scalar @{$self->{objects}} : 0;
+	my $self = shift;
+	$self->reset;
+	defined $self->_count || $self->_count( scalar @{ $self->{objects} } ) || $self->_count(0);
+	return defined $self->_count ? $self->_count : 0;
 }
 
 # grab all the elements of the retrieved collection
 sub get {
-  my $self = shift;
-  return @{$self->{objects}};
+	my $self = shift;
+	return @{ $self->objects };
 }
 
-# get_next: iterator for returned collections
+# get_next: iterator over collections
 sub get_next {
-  my $self=shift;
-  my $next=sub{ return --$self->{__count} };
-  my $this=$next->();
-  if( $this == -1 ) { 
-    $self->{__count}=0;
-    return undef;
-  } else {
-    return $self->{objects}->[$this];
-  }
+	my $self = shift;
+	my $next = sub { return ( $self->_count( $self->_count - 1 ) - 1 ) };
+	my $this = $next->();
+	if ( $self->_count < 0 ) {
+		$self->_count(0);
+		return undef;
+	} else {
+		return $self->objects->[$this];
+	}
 }
 
 # reset Cursor's object count
 # called explicitly to reset the iterator
 sub reset {
-  my $self=shift;
-  my $cur_count=$self->{__count}; # remember iterator position
-  $self->_reconstitute($self->args);
+	 my $self = shift;
+	 $self->_count(undef);
+	 $self->_reconstitute($self->args);
 }
 
 # applies the passed subroutine reference to stored objects
@@ -120,11 +156,7 @@ sub traverse {
 	my $self = shift;
 	$self->throw("not implemented");
 }
-
-
 1;
-
-
 __END__
 
 # POD documentation - main docs before the code
