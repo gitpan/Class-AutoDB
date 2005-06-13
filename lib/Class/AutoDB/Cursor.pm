@@ -1,251 +1,111 @@
 package Class::AutoDB::Cursor;
-use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
+use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS %DEFAULTS);
 use strict;
+use DBI;
 use Class::AutoClass;
-use Class::AutoDB::Registry;
-use Data::Dumper;
-@ISA              = qw(Class::AutoClass);      # AutoClass must be first!!
-@AUTO_ATTRIBUTES  = qw(args _count objects);
-@OTHER_ATTRIBUTES = qw();
-%SYNONYMS         = ();
+use Class::AutoClass::Args;
+@ISA = qw(Class::AutoClass);
+
+# Cursor for AutoDB queries
+
+@AUTO_ATTRIBUTES=qw(query dbh select_sth count_sth is_started object_table);
+@OTHER_ATTRIBUTES=qw();
+%SYNONYMS=();
+%DEFAULTS=(object_table=>'_AutoDB',is_started=>0);
 Class::AutoClass::declare(__PACKAGE__);
 
 sub _init_self {
-	my ( $self, $class, $args ) = @_;
-	return unless $class eq __PACKAGE__;         # to prevent subclasses from re-running this
-	$self->args($args);
-	$self->_reconstitute($args);
-	return $self;
+  my($self,$class,$args)=@_;
+  return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
 }
-
-# reconstitute the object with its stored data -
-# $data param contains a collection object and, optionally, search keys
-sub _reconstitute {
-	my ( $self, $data ) = @_;
-	my @objects;
-	# if collection(s) were given, they will be iterated over - else ALL collections will be
-	my $collections = $data->search->collection;
-	my $classes     = $data->search->class;
-	$self->throw(
-					 "Class::AutoDB::Cursor requires a Class::AutoDB::Collection object and your search keys")
-		unless $collections;
-	my (
-		%searchable_keys,           # user-specified keys to search
-		%searchable_collections,    # user-specified collections to search
-		%searchable_classes,        # user-specified classes to search
-		%collection,								# collection objects for searched collections
-		$sql,                       #  SQL query string
-		%oids,                      # unique oid's
-		$ary_ref
-		 );
-
-	# get a unique list of all search params
-	map { $searchable_classes{$_}++ } @$classes;
-	map { $searchable_collections{$_}++ } @$collections;
-
-	# filter for existing keys (ignore class and collection args)
-	foreach ( keys %{ $data->search } ) {
-		next if $_ eq 'collection';
-		next if $_ eq 'class';
-		next if $_ =~ /__search/;    # search flags
-		$searchable_keys{$_} = $data->search->{$_};
-	}
-	$sql = qq/SELECT DISTINCT * FROM 
-  		                $Class::AutoDB::Registry::COLLECTION_TABLE WHERE/;
-	if ( my $arg_cnt = ( scalar keys %searchable_collections ) ) {
-		foreach ( keys %searchable_collections ) {
-			$arg_cnt--;
-			$sql .= qq/ collection_name="$_" /;
-			$sql .= " OR " if $arg_cnt;
-		}
-	}
-	if ( my $arg_cnt = ( scalar keys %searchable_classes ) ) {    # class search
-		$sql .= ' AND (' if $sql =~ /collection_name/;
-		foreach ( keys %searchable_classes ) {
-			$arg_cnt--;
-			$sql .= qq/ class_name="$_" /;
-			$sql .= " OR " if $arg_cnt;
-		}
-		$sql .= ')' if $sql =~ /collection_name/;
-	}
-	# now query for attributes (other than class,collection), if any
-	if ( scalar keys %searchable_keys ) {
-		my $valid_rows = $data->{dbh}->selectall_hashref( $sql, 2 );    # key on collection_name
-		my ($registry) = $data->{dbh}->selectrow_array(
-		   qq(SELECT object FROM 
-		   $Class::AutoDB::Registry::OBJECT_TABLE WHERE 
-		   oid="$Class::AutoDB::Registry::REGISTRY_OID"));
-    my $thaw;
-    eval $registry;    # sets $thaw
-		foreach my $coll (keys %$valid_rows) {
-		   while(my($k,$v) = each %{$thaw->{name2coll}->{$coll}->{_keys}}) {
-		     if($v =~ /list/) {
-		       $collection{$coll .  '_' . $k}++; # add list name to %collection
-		     } else {
-		       $collection{$coll}++;
-		     }
-		   }
-		}
-		foreach my $rowref ( keys %collection ) {
-			my $sql = qq/SELECT DISTINCT oid FROM 
-  		                 $rowref WHERE /;
-			my $arg_cnt = scalar keys %searchable_keys;
-			while ( my ( $k, $v ) = each %searchable_keys ) {
-				$sql .= " $k = \'$v\' ";
-				$sql .= " AND " if --$arg_cnt;
-			} 				
-				$ary_ref = $data->{dbh}->selectall_arrayref($sql);
-				last if $ary_ref;
-		}
-	} else { # no searchable attributes
-		$ary_ref = $data->{dbh}->selectall_arrayref($sql);
-	}
-	# reconstitution - create an instance of the stored object
-	foreach (@$ary_ref) {
-		my $oid = $_->[0];
-		next if $oids{$oid};
-		$oids{ $_->[0] }++;
-		my ( $fetched, $thaw );
-		$sql = qq/select object from $Class::AutoDB::Registry::OBJECT_TABLE where oid=$oid/;
-		eval { $fetched = $data->{dbh}->selectall_arrayref($sql) };
-		next unless $fetched->[0];
-		eval $fetched->[0]->[0];    # sets thaw
-		push @objects, bless $thaw, $thaw->{_CLASS};
-	}
-	$self->_count( scalar @objects );
-	$self->objects( \@objects );
-}
-
-# return the number of objects in the retrieved collection
-sub count {
-	my $self = shift;
-	$self->reset;
-	defined $self->_count || $self->_count( scalar @{ $self->{objects} } ) || $self->_count(0);
-	return defined $self->_count ? $self->_count : 0;
-}
-
-# grab all the elements of the retrieved collection
 sub get {
-	my $self = shift;
-	return @{ $self->objects };
+  my($self,$n)=@_;
+  $self->reset unless $self->is_started;
+  my($dbh,$sth)=($self->dbh,$self->select_sth);
+  my $rows=$sth->fetchall_arrayref(undef,$n) || 
+    $self->throw("Database error in fetch for query\n".$self->select_sql."\n".$dbh->errstr);
+  my @objects;
+  for my $row (@$rows) {
+    my($oid,$freeze)=@$row;
+    my $object=Class::AutoDB::Serialize::thaw($oid,$freeze);
+    push(@objects,$object);
+  }
+  wantarray? @objects: \@objects;
 }
+#*get_all=\&get;
 
-# get_next: iterator over collections
 sub get_next {
-	my $self = shift;
-	my $next = sub { return ( $self->_count( $self->_count - 1 ) - 1 ) };
-	my $this = $next->();
-	if ( $self->_count < 0 ) {
-		$self->_count(0);
-		return undef;
-	} else {
-		return $self->objects->[$this];
-	}
+  my($self)=@_;
+  $self->reset unless $self->is_started;
+  my($dbh,$sth)=($self->dbh,$self->select_sth);
+  return undef unless $sth && $sth->{Active};
+  my $object;
+  my($oid,$freeze)=$sth->fetchrow_array;
+  if (!$freeze) {		# either end of results or error
+    $self->throw("Database error in fetch for query\n".$self->select_sql."\n".$dbh->errstr) 
+      if $dbh->err;
+  } else {
+    $object=Class::AutoDB::Serialize::thaw($oid,$freeze);
+  }
+  $object;
 }
-
-# reset Cursor's object count
-# called explicitly to reset the iterator
+sub count {
+  my($self)=@_;
+  my($sql,$dbh,$sth)=($self->count_sql,$self->dbh,$self->count_sth);
+  if ($sql && $dbh && !$sth) {
+    $sth=$dbh->prepare($sql) || 
+      $self->throw("Database error in prepare for query\n$sql\n".$dbh->errstr);
+    $sth->execute || $self->throw("Database error in exectue for query\n$sql\n".$dbh->errstr);
+    $self->count_sth($sth);
+  } elsif ($sql && $sth) {
+    $sth->execute || $self->throw("Database error in exectue for query\n$sql\n".$dbh->errstr);
+  }
+  my($count)=$sth->fetchrow_array || 
+    $self->throw("Database error in fetch for query\n$sql\n".$dbh->errstr);
+  $count;
+}
+sub select_sql {
+  my($self)=@_;
+  my($object_table,$query)=($self->object_table,$self->query);
+  my $sql="SELECT $object_table.oid,$object_table.object $query";
+  $sql;
+}
+sub count_sql {
+  my($self)=@_;
+  my($object_table,$query)=($self->object_table,$self->query);
+  my $sql="SELECT COUNT($object_table.oid) $query";
+  $sql;
+}
 sub reset {
-	 my $self = shift;
-	 $self->_count(undef);
-	 $self->_reconstitute($self->args);
+  my($self)=@_;
+  my($sql,$dbh,$sth)=($self->select_sql,$self->dbh,$self->select_sth);
+  if ($sql && $dbh && !$sth) {
+    $sth=$dbh->prepare($sql) || 
+      $self->throw("Database error in prepare for query\n$sql\n".$dbh->errstr);
+    $sth->execute || $self->throw("Database error in exectue for query\n$sql\n".$dbh->errstr);
+    $self->select_sth($sth);
+  } elsif ($sql && $sth) {
+    $sth->execute || $self->throw("Database error in exectue for query\n$sql\n".$dbh->errstr);
+  }
+  $self->is_started(1);
 }
 
-# applies the passed subroutine reference to stored objects
-sub traverse {
-	my $self = shift;
-	$self->throw("not implemented");
+# TODO: decide on has_more -- requires a look ahead buffer -- not a big deal, but do we need it?
+
+# TODO: implement find - conjoins existing SQL with new query
+sub find {
 }
+sub do_sql {
+  my $self=shift;
+  my @sql=_flatten(@_);
+  $self->throw("Cannot run SQL unless connected") unless $self->is_connected;
+  my $dbh=$self->dbh;
+  for my $sql (@sql) {
+    next unless $sql;
+    $dbh->do($sql);
+    $self->throw("SQL error: ".$dbh->errstr) if $dbh->err;
+  }
+}
+sub _flatten {map {'ARRAY' eq ref $_? @$_: $_} @_;}
+
 1;
-__END__
-
-# POD documentation - main docs before the code
-
-=head1 NAME
-
-Class::AutoDB::Cursor
-
-=head1 SYNOPSIS
-
-use Class::AutoDB::Cursor;
-
-$cursor = Class::AutoDB->new(
-                            -dsn=>"DBI:$DB_NAME:database=$DB_DATABASE;host=$DB_SERVER",
-                            -user=>$DB_USER,
-                            -password=>$DB_PASS,
-                            -find=>{-collection=>'TestAutoDB'}
-                          );
-
--- or --
-
-$autodb = Class::AutoDB->new(
-                            -dsn=>"DBI:$DB_NAME:database=$DB_DATABASE;host=$DB_SERVER",
-                            -user=>$DB_USER,
-                            -password=>$DB_PASS
-                          );
-
-
-$cursor = $autodb->find(-collection=>'TestAutoDB');
-
-=head1 DESCRIPTION
-
-Cursor object is a wrapper around persistant objects. It will return all objects or
-iterate (NOT YET IMPLEMENTED) over objects that the user has requested to fetch (usually through Class::AutoDB::find method).
-
-=head1 KNOWN BUGS AND CAVEATS
-
-This is still a work in progress.  
-
-=head2 Bugs, Caveats, and ToDos
-
-  TBD
-
-=head1 AUTHOR - Nat Goodman, Chris Cavnor
-
-Email ccavnor@systemsbiology.org
-
-=head1 COPYRIGHT
-
-Copyright (c) 2003 Institute for Systems Biology (ISB). All Rights Reserved.
-
-This module is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
-
-=head1 APPENDIX
-
-The rest of the documentation describes the methods.
-
-=head2 Constructor
-
- Title   : new
-
- Usage   : $cursor=new Class::AutoDB::Cursor($args);
- Function: Create object
- Returns : New Class::AutoDB::Cursor object
- Args    : Class::AutoClass::Args instance containing the following arguments:
-           -search
-           -DBI::dbh
-           -collection
- Notes   : see CursorTest.t for working examples
-           
-=head2 get
- Usage   : $cursor->get;
- Function: Retrieves persisted collections
- Returns : an arrayref of objects
- Args    : None
- Notes   : see CursorTest.t for working examples
- 
-=head2 get_next
- Usage   : $cursor->get_next;
- Function: iterator over recalled collections
- Returns : an object, undef if last object
- Args    : None
- Notes   : $cursor->reset to reset iterator pointer. See CursorTest.t for working examples
- 
- =head2 reset
- Usage   : $cursor->reset;
- Function: reset iterator to point to first object in retrieved collection
- Returns : 
- Args    : None
- Notes   : See CursorTest.t for working examples
-=cut

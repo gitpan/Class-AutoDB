@@ -1,0 +1,131 @@
+-- MySQL dump 8.22
+--
+-- Host: localhost    Database: automagic__testsuite
+---------------------------------------------------------
+-- Server version	3.23.56
+
+--
+-- Table structure for table '_autodb'
+--
+
+CREATE TABLE _autodb (
+  id varchar(15) NOT NULL default '',
+  object longblob,
+  PRIMARY KEY  (id)
+) TYPE=MyISAM;
+
+--
+-- Dumping data for table '_autodb'
+--
+
+
+INSERT INTO _autodb VALUES ('Registry','$thaw = {\n  \'collection_table\' => \'_COLLECTIONS\',\n  \'_CLASS\' => \'Class::AutoDB::Registry\',\n  \'object_table\' => \'_AutoDB\',\n  \'name2coll\' => {\n    \'Thing\' => bless( {\n      \'_tables\' => [\n        bless( {\n          \'name\' => \'Thing\',\n          \'_keys\' => {\n            \'location\' => \'string\',\n            \'name\' => \'string\',\n            \'attending\' => \'object\'\n          }\n        }, \'Class::AutoDB::Table\' ),\n        bless( {\n          \'name\' => \'Thing_sites\',\n          \'_keys\' => {\n            \'sites\' => \'list(string)\'\n          }\n        }, \'Class::AutoDB::Table\' )\n      ],\n      \'name\' => \'Thing\',\n      \'_keys\' => {\n        \'sites\' => \'list(string)\',\n        \'location\' => \'string\',\n        \'name\' => \'string\',\n        \'attending\' => \'object\'\n      }\n    }, \'Class::AutoDB::Collection\' ),\n    \'Place\' => bless( {\n      \'_tables\' => [\n        bless( {\n          \'name\' => \'Place\',\n          \'_keys\' => {\n            \'location\' => \'string\',\n            \'name\' => \'string\',\n            \'attending\' => \'object\'\n          }\n        }, \'Class::AutoDB::Table\' ),\n        bless( {\n          \'name\' => \'Place_sites\',\n          \'_keys\' => {\n            \'sites\' => \'list(string)\'\n          }\n        }, \'Class::AutoDB::Table\' )\n      ],\n      \'name\' => \'Place\',\n      \'_keys\' => {\n        \'sites\' => \'list(string)\',\n        \'location\' => \'string\',\n        \'name\' => \'string\',\n        \'attending\' => \'object\'\n      }\n    }, \'Class::AutoDB::Collection\' )\n  }\n};\n');
+INSERT INTO _autodb VALUES ('168220070041','$thaw = {\n  \'_CLASS\' => \'Place\',\n  \'sites\' => [\n    \'rock\',\n    \'tree\'\n  ],\n  \'location\' => \'location1\',\n  \'__listname\' => [\n    \'Thing_sites\',\n    \'Place_sites\'\n  ],\n  \'name\' => \'Place1\',\n  \'__collections\' => [\n    \'Place\',\n    \'Thing\'\n  ],\n  \'dsn\' => \'DBI:mysql:database=automagic__testsuite;host=localhost\',\n  \'__object_id\' => \'168220070041\',\n  \'user\' => \'root\'\n};\n');
+INSERT INTO _autodb VALUES ('163675484037','$thaw = {\n  \'_CLASS\' => \'Place\',\n  \'sites\' => [\n    \'starfish\',\n    \'beach\'\n  ],\n  \'location\' => \'location2\',\n  \'__listname\' => [\n    \'Thing_sites\',\n    \'Place_sites\'\n  ],\n  \'name\' => \'Place2\',\n  \'__collections\' => [\n    \'Place\',\n    \'Thing\'\n  ],\n  \'dsn\' => \'DBI:mysql:database=automagic__testsuite;host=localhost\',\n  \'__object_id\' => \'163675484037\',\n  \'user\' => \'root\'\n};\n');
+INSERT INTO _autodb VALUES ('112637709626','$thaw = {\n  \'_CLASS\' => \'Place\',\n  \'sites\' => [\n    \'fish\',\n    \'duck\'\n  ],\n  \'location\' => \'location3\',\n  \'__listname\' => [\n    \'Thing_sites\',\n    \'Place_sites\'\n  ],\n  \'name\' => \'Place3\',\n  \'__collections\' => [\n    \'Place\',\n    \'Thing\'\n  ],\n  \'dsn\' => \'DBI:mysql:database=automagic__testsuite;host=localhost\',\n  \'__object_id\' => \'112637709626\',\n  \'user\' => \'root\'\n};\n');
+INSERT INTO _autodb VALUES ('180359954642','$thaw = {\n  \'_CLASS\' => \'Thing\',\n  \'friends\' => [],\n  \'__listname\' => [],\n  \'name\' => \'Thingy1\',\n  \'__collections\' => [\n    \'Thing\'\n  ],\n  \'sex\' => \'unknown\',\n  \'dsn\' => \'DBI:mysql:database=automagic__testsuite;host=localhost\',\n  \'__object_id\' => \'180359954642\',\n  \'user\' => \'root\'\n};\n');
+INSERT INTO _autodb VALUES ('198192517341','$thaw = {\n  \'_CLASS\' => \'Thing\',\n  \'friends\' => [],\n  \'__listname\' => [],\n  \'name\' => \'Thingy2\',\n  \'__collections\' => [\n    \'Thing\'\n  ],\n  \'sex\' => \'indeterminant\',\n  \'dsn\' => \'DBI:mysql:database=automagic__testsuite;host=localhost\',\n  \'__object_id\' => \'198192517341\',\n  \'user\' => \'root\'\n};\n');
+INSERT INTO _autodb VALUES ('1008577511072','$thaw = {\n  \'_CLASS\' => \'Thing\',\n  \'friends\' => [],\n  \'__listname\' => [],\n  \'name\' => \'Thingy3\',\n  \'__collections\' => [\n    \'Thing\'\n  ],\n  \'sex\' => \'unclassified\',\n  \'dsn\' => \'DBI:mysql:database=automagic__testsuite;host=localhost\',\n  \'__object_id\' => \'1008577511072\',\n  \'user\' => \'root\'\n};\n');
+
+--
+-- Table structure for table 'collection_link'
+--
+
+CREATE TABLE collection_link (
+  object varchar(15) default NULL,
+  class varchar(255) default NULL,
+  cid varchar(255) default NULL
+) TYPE=MyISAM;
+
+--
+-- Dumping data for table 'collection_link'
+--
+
+
+INSERT INTO collection_link VALUES ('168220070041','Place','Place');
+INSERT INTO collection_link VALUES ('168220070041','Place','Thing');
+INSERT INTO collection_link VALUES ('163675484037','Place','Place');
+INSERT INTO collection_link VALUES ('163675484037','Place','Thing');
+INSERT INTO collection_link VALUES ('112637709626','Place','Place');
+INSERT INTO collection_link VALUES ('112637709626','Place','Thing');
+INSERT INTO collection_link VALUES ('180359954642','Thing','Thing');
+INSERT INTO collection_link VALUES ('163675484037','Thing','Thing');
+INSERT INTO collection_link VALUES ('112637709626','Thing','Thing');
+
+--
+-- Table structure for table 'place'
+--
+
+CREATE TABLE place (
+  object varchar(15) NOT NULL default '',
+  location longtext,
+  name longtext,
+  attending varchar(15) default NULL,
+  PRIMARY KEY  (object)
+) TYPE=MyISAM;
+
+--
+-- Dumping data for table 'place'
+--
+
+
+INSERT INTO place VALUES ('168220070041','location1','Place1',NULL);
+INSERT INTO place VALUES ('163675484037','location2','Place2',NULL);
+INSERT INTO place VALUES ('112637709626','location3','Place3',NULL);
+
+--
+-- Table structure for table 'place_sites'
+--
+
+CREATE TABLE place_sites (
+  object varchar(15) NOT NULL default '',
+  sites longtext
+) TYPE=MyISAM;
+
+--
+-- Dumping data for table 'place_sites'
+--
+
+
+INSERT INTO place_sites VALUES ('168220070041','tree');
+INSERT INTO place_sites VALUES ('168220070041','rock');
+INSERT INTO place_sites VALUES ('163675484037','starfish');
+INSERT INTO place_sites VALUES ('163675484037','beach');
+INSERT INTO place_sites VALUES ('112637709626','duck');
+INSERT INTO place_sites VALUES ('112637709626','fish');
+
+--
+-- Table structure for table 'thing'
+--
+
+CREATE TABLE thing (
+  object varchar(15) NOT NULL default '',
+  name longtext,
+  sex longtext,
+  PRIMARY KEY  (object)
+) TYPE=MyISAM;
+
+--
+-- Dumping data for table 'thing'
+--
+
+
+INSERT INTO thing VALUES ('180359954642','Thingy1','unknown');
+INSERT INTO thing VALUES ('198192517341','Thingy2','indeterminant');
+INSERT INTO thing VALUES ('1008577511072','Thingy3','unclassified');
+
+--
+-- Table structure for table 'thing_friends'
+--
+
+CREATE TABLE thing_friends (
+  object varchar(15) NOT NULL default '',
+  friends varchar(15) default NULL
+) TYPE=MyISAM;
+
+--
+-- Dumping data for table 'thing_friends'
+--
+
+
+
