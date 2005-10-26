@@ -57,13 +57,14 @@ my @WHATS=qw(create drop alter);
 my %WHATS=abbrev @WHATS;
 
 sub schema {
-  my($self,$what)=@_;
+  my($self,$what,$index_flag)=@_;
   $what or $what='create';
+  $index_flag = defined $index_flag ? $index_flag : 1; # indexing is default operation
   $what=$WHATS{lc($what)} || $self->throw("Invalid \$what for schema: $what. Should be one of: @WHATS");
   my @sql;
   if ($what eq 'create') {	# create current collections
     push(@sql,map {$_->drop} $self->saved->collections); # drop existing collections first
-    push(@sql,map {$_->create} $self->current->collections); # then create new ones
+    push(@sql,map {$_->create($index_flag)} $self->current->collections); # then create new ones
   } elsif ($what eq 'drop') {	# drop current & saved collections
     push(@sql,map {$_->drop} $self->saved->collections);
     push(@sql,map {$_->drop} $self->current->collections);

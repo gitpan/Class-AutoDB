@@ -60,7 +60,12 @@ sub put {
     if ($type eq 'object' && defined $value) {
       $value=$value->oid;
     } elsif ($type eq 'list(object)' && defined $value) {
-      @$value=map {$_->oid} @$value
+      # Bug fix NG 05-08-22: $value points to the list in the _REAL_ object
+      #   Orginal code clobbered this list
+      #   Fixed code creates new empty list and copies oids there
+      my $oids=[];
+      @$oids=map {$_->oid} @$value;
+      $value=$oids;
     }
     $key_values{$key}=$value;
   }
@@ -70,9 +75,9 @@ sub put {
   wantarray? @sql: \@sql;
 }
 sub create {
-  my($self)=@_;
+  my($self,$index_flag)=@_;
   my @sql=map {$_->drop} $self->tables;	# drop tables if they exist
-  push(@sql,map {$_->create} $self->tables);
+  push(@sql,map {$_->index($index_flag); $_->create} $self->tables);
   wantarray? @sql: \@sql;
 }
 sub drop {

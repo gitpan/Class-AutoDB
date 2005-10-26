@@ -7,10 +7,11 @@ use Class::AutoDB::ListTable;
 # Simple black box testing of the interface
 
 sub do_test {
-  my($testname,$name,$keys,$create)=@_;
+  my($testname,$name,$keys,$create,$index)=@_;
   my @args;
   push(@args,(-name=>$name)) if $name;
   push(@args,(-keys=>$keys)) if $keys;
+  push(@args,(-index=>$index)) if defined $index;
   my $table=new Class::AutoDB::ListTable(@args);
   ok($table,"$testname: new");
   is($table->name,$name,"$testname: name");
@@ -88,7 +89,7 @@ my $table=do_test
    {key1=>'string'},
    q(create table Person_key1
      (oid bigint unsigned not null, key1 longtext, index(oid), index(key1(255)))),
-  );
+  );  
 my $table=do_test
   ('table with name and integer key',
    'Person_key1',

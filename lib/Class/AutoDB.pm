@@ -1,4 +1,5 @@
 package Class::AutoDB;
+# $Id: AutoDB.pm,v 1.46 2005/07/15 23:08:10 ccavnor Exp $
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
 use strict;
 use DBI;
@@ -9,7 +10,7 @@ use Class::AutoDB::Connect;
 use Class::AutoDB::Database;
 use Class::AutoDB::Registry;
 use Class::AutoDB::RegistryDiff;
-our $VERSION = '0.091';
+our $VERSION = '0.092';
 
 @ISA = qw(Class::AutoClass Class::AutoDB::Connect Class::AutoDB::Database);
 
@@ -75,6 +76,7 @@ sub manage_registry {
   my $drop=$args->drop;
   my $create=$args->create;
   my $alter=$args->alter;
+  my $index=$args->index;
   my $op_count=($create>0)+($alter>0)+($drop>0);
   $self->throw("It is illegal to set more than one of -create, -alter, -drop") if $op_count>1;
   $self->throw("Schema changes not allowed by -read_only or -read_only_schema setting") 
@@ -85,7 +87,7 @@ sub manage_registry {
   $registry->get;
 
   # do create first, since it changes schema
-  $self->create if $create || (!$self->exists && !$read_only_schema);
+  $self->create($index) if $create || (!$self->exists && !$read_only_schema);
   
   $registry->merge;		# merge current and saved versions. computes diff.
 
@@ -573,7 +575,8 @@ constructed by concatenating the collection name and key name, with a
      );
 
 A small detail: since the whole purpose of these tables is to enable
-querying, indexes are created for each column by default.
+querying, indexes are created for each column by default (indexes can
+be turned off by specifiying index=>0 to the AutoDB constructor).
 
 When the system stores an object, it converts any object references
 contained therein into the oids for those objects. In other words,

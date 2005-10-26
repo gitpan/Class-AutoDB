@@ -7,7 +7,7 @@ use Class::AutoDB::Globals;
 use Text::Abbrev;
 @ISA = qw(Class::AutoClass); # AutoClass must be first!!
 
-@AUTO_ATTRIBUTES=qw(name _keys);
+@AUTO_ATTRIBUTES=qw(name _keys index);
 @OTHER_ATTRIBUTES=qw(keys);
 %DEFAULTS=(_keys=>{});
 Class::AutoClass::declare(__PACKAGE__);
@@ -86,7 +86,8 @@ This class represents schema information for one table. This class is
 fed a HASH of key=E<gt>type pairs. Each turns into one column of the
 table. In addition, the table has an 'object' column which is a foreign
 key pointing to the AutoDB object table and which is the primary key
-here. Indexes are defined on all keys. This class just creates SQL;
+here. Indexes are defined on all keys (unless index=>0 is passed as an AutoDB 
+constructor argument). This class just creates SQL; 
 I<it does not talk to the database>.
 
 At present, only our special data types ('string', 'integer', 'float',

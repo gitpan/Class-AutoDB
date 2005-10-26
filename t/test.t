@@ -154,6 +154,10 @@ my @test_files=
      t/testAutoDB14c.put_all.t
      t/testAutoDB14d.find.t
      t/testAutoDB14e.count.t
+
+     t/testAutoDB15a.list_object_bug.setup.t
+     t/testAutoDB15b.list_object_bug.run.t
+
      t/_cleanup
     );
 

@@ -35,14 +35,12 @@ patches/Dumper.pm.patch
 patches/Dumper.xs.patch
 patches/README.patch
 README
-t/.AUTODB_performance
 t/_cleanup
 t/cursor.pl
 t/Person.pm
 t/person_test.pl
 t/test.setup.sql
 t/test.t
-t/test_schemas/place.dump
 t/testAutoDB.t
 t/testAutoDB00.setup.t
 t/testAutoDB01.pm
@@ -212,6 +210,5 @@ t/testTable02.list.t
 t/Thing.pm
 t/xxx
 t/xxx.pl
-t/yaml.pl
 t/yyy
 test.pl

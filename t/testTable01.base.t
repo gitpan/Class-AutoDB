@@ -7,10 +7,11 @@ use Class::AutoDB::BaseTable;
 # Simple black box testing of the interface
 
 sub test {
-  my($testname,$name,$keys,$create,$alter)=@_;
+  my($testname,$name,$keys,$create,$alter,$index)=@_;
   my @args;
-  push(@args,(-name=>$name)) if $name;
-  push(@args,(-keys=>$keys)) if $keys;
+  push(@args,(-name=>$name)) if defined $name;
+  push(@args,(-keys=>$keys)) if defined $keys;
+  push(@args,(-index=>$index)) if defined $index;
   my $table=new Class::AutoDB::BaseTable(@args);
   ok($table,"$testname: new");
   is($table->name,$name,"$testname: name");
@@ -111,7 +112,7 @@ sub norm_keywords {
 
 my $table=test('empty table');
 my $table=test
-  ('table with name',
+  ('table with name - implicit index',
    'Person',
    undef,
    q(create table Person (oid bigint unsigned not null, primary key (oid))),
@@ -132,7 +133,18 @@ my $table=test
      add friend bigint unsigned, add name longtext, add grade_avg double, add dob int,
      add index(friend), add index(name(255)), add index(grade_avg), add index(dob)),
   );
-
+my $table=test
+  ('table with name and keys (no index)',
+   'Person',
+   {name=>'string',dob=>'integer',grade_avg=>'float',friend=>'object'},
+   q(create table Person
+     (oid bigint unsigned not null, friend  bigint unsigned, name longtext, 
+      grade_avg double, dob int,
+      primary key (oid))),
+   q(alter table Person
+     add friend bigint unsigned, add name longtext, add grade_avg double, add dob int),
+     0
+  );  
 my $table=test
   ('table with name and 2 keys of each type',
    'Person',

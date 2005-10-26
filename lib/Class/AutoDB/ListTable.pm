@@ -62,12 +62,22 @@ sub create {
   my($self)=@_;
   my $name=$self->name;
   my $keys=$self->keys;
-  my @columns=('oid bigint unsigned not null, index(oid)');
+  my $index = defined $self->index ? $self->index : 1; # indexing is default
+  my @columns;
+  if($index) {
+    @columns=('oid bigint unsigned not null, index(oid)');
+  } else {
+    @columns=('oid bigint unsigned not null');
+  }
   while(my($key,$type)=each %$keys) { # Note: there should be exactly one key
     my $sql_type=$TYPES{$TYPES_ABBREV{$type}} or
       $self->throw("Invalid data type for key $key: $type. Should be one of: ".join(' ',@TYPES));
-    my $index=$sql_type ne 'longtext'? "index($key)": "index($key(255))";
-    push(@columns,"$key $sql_type,$index");
+    if($index) {  
+      $index=$sql_type ne 'longtext'? "index($key)": "index($key(255))";
+      push(@columns,"$key $sql_type,$index");
+    } else {
+      push(@columns,"$key $sql_type");
+    }
   }
   my $sql=@columns? "create table $name \(".join(',',@columns)."\)": '';
   wantarray? ($sql): [$sql];

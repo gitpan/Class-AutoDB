@@ -50,14 +50,17 @@ sub parse_query {
   my $name=$args->collection;
   delete $args->{collection};	# so 'collection' will not be confused with a search key!
   my $query=$args->query? $args->query: $args;
-
   my $dbh=$self->dbh;
   my $object_table=$self->object_table;
   my $collection=$self->registry->collection($name) || $self->throw("Unknown collection $name");
   my $keys=$collection->keys;
-  my @where;
+  my (@where,$limit);
   my %tables=($name=>$name);	# always include base table
   while(my($key,$value)=each %$query) {	# create SQL condition for each search key
+    if ($key eq '_limit_') { # reserved keyword
+      $limit = $value;
+      next;
+    }
     my $type=$keys->{$key} || $self->throw("Unkown key $key for collection $name");
     my($db_type,$list_type,$table);
     if ($type=~/^list/) {
@@ -81,10 +84,14 @@ sub parse_query {
   my $from=join(',',$object_table,keys %tables);
   my $where=join(' AND ',@where);
   my $query="FROM $from WHERE $where";
+  if($limit) {
+    $query .= ' LIMIT ';
+    $query .= $limit;
+  }
   $query;
 }
 sub create {
-  my($self)=@_;
+  my($self,$index_flag)=@_;
   $self->throw("Cannot create database unless connected") unless $self->is_connected;
   my $registry=$self->registry;
   my $dbh=$self->dbh;
@@ -95,7 +102,7 @@ sub create {
 	     qq(create table $object_table (oid bigint unsigned not null,
 					    object longblob,
 					    primary key (oid)))));
-  push(@sql,$registry->schema('create')); # create collections (drops tables first)
+  push(@sql,$registry->schema('create', $index_flag)); # create collections (drops tables first)
   $self->do_sql(@sql);		          # do it!
   $registry->saved($registry->current);	  # current version is now the real one
   $registry->put;		          # store registry

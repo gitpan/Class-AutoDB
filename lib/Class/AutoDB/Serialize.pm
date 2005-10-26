@@ -15,7 +15,7 @@ use Data::Dumper;
 Class::AutoClass::declare(__PACKAGE__);
 
 my $DUMPER=new Data::Dumper([undef],['thaw']) ->
-  Purity(1)->Indent(0)->
+  Purity(1)->Indent(1)->
   Freezer('DUMPER_freeze')->Toaster('DUMPER_thaw');
 
 my $GLOBALS=Class::AutoDB::Globals->instance();
@@ -33,7 +33,7 @@ sub _init_self {
 sub DUMPER_freeze {
   my($self)=@_;
   my $oid=$OBJ2OID->{refaddr $self};
-#  print ">>> DUMPER_freeze ",$oid,"\n";
+  #print ">>> DUMPER_freeze ->$oid<- ($self)\n";
   return bless {_OID=>$oid,_CLASS=>ref $self},'Class::AutoDB::Oid';
 }
 sub oid2obj {			# allow call as object or class method, or function
@@ -44,6 +44,7 @@ sub oid2obj {			# allow call as object or class method, or function
 sub obj2oid {			# allow call as class method or function
   shift unless ref $_[0];
   my $obj=shift;
+  #print ">>>>>>>>>> obj2oid on $obj\n";
   @_? $OBJ2OID->{refaddr $obj}=$_[0]: $OBJ2OID->{refaddr $obj};
 }
 *oid=\&obj2oid;
@@ -81,7 +82,7 @@ sub fetch {			# allow call as object or class method, or function
 #   weaken($OID2OBJ->{$oid});
   } elsif (UNIVERSAL::isa($obj,'Class::AutoDB::Oid')) { # case 2
     $obj=really_fetch($oid,$obj) || return undef;
-  }				                        # case 3 -- nothing more to do
+  }		                        # case 3 -- nothing more to do
   $obj;
 }
 # used by 'get' methods in Cursor
@@ -104,9 +105,11 @@ sub really_store {
   my($self,$freeze)=@_;
   my($sth,$ret);
   my $dbh=$GLOBALS->dbh;
+  my $oid = obj2oid($self) || $self->oid || $OBJ2OID->{refaddr $self};
+  #print ">>> storing  ->$oid<-($self)", ref $self, "\n";
 #  $sth=$dbh->prepare(qq(insert into _AutoDB(oid,object) values (?,?)));
   $sth=$dbh->prepare(qq(REPLACE INTO _AutoDB(oid,object) VALUES (?,?)));
-  $sth->bind_param(1,obj2oid($self));
+  $sth->bind_param(1,$oid);
   $sth->bind_param(2,$freeze);
   $ret=$sth->execute or confess $sth->errstr;
 }
@@ -121,6 +124,10 @@ sub really_fetch {
   my($freeze)=$sth->fetchrow_array;
   unless ($freeze) {
     confess $sth->errstr if $sth->err;
+    my $class=$obj->{_CLASS};
+    warn qq/Trying to deserialize an instance of class $class with oid \'$oid\'. Ensure that: 
+    \t 1) The object was serialized correctly (you may have forgotten to call put() on it). 
+    \t 2) You can connect to the data source in which it has been serialized.\n/;
     return undef;
   }
   really_thaw($oid,$obj,$freeze);
@@ -129,23 +136,19 @@ sub really_thaw {
   my($oid,$obj,$freeze)=@_;
   my $thaw;			# variable used in $DUMPER
   eval $freeze;			# sets $thaw
-
   # if the thawed structure is circular and refers to the present object,
   # the act of thawing will have created an Oid for the present object.
   # if so, use it.
   $obj or $obj=oid2obj($oid);
-  
   # remove Oid attributes from thawed object and Oid if it exists
   my $class=$thaw->{_CLASS};
   delete @$thaw{qw(_CLASS _OID)}; 
   delete @$obj{qw(_CLASS _OID)} if $obj;
   $obj or $obj={};
-  
   # copy data back from thawed structure to obj. this leaves embedded Oids un-fetched 
   @$obj{keys %$thaw}=values %$thaw;
   # bless $obj (or rebless Oid) to real class
   bless $obj,$class;
-
 }
 
 sub DESTROY {

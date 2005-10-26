@@ -25,3 +25,5 @@ Revision history
        1016242 	create flag not working for registry
        1016238 	_registry_is_saved error
        1017046 	not all objects stored
+0.09?
+	  Added ability to turn of automatic indexing
