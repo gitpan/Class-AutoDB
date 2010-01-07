@@ -25,12 +25,15 @@ sub _init_self {
   while(my($key,$type)=each %$baseline_keys) {
     my $other_type=$other_keys->{$key};
     if (defined $other_type) {
-      if ($type eq $other_type) {
+      # NG 09-12-27: let abbreviated keys match
+      # if ($type eq $other_type) {
+      if (Class::AutoDB::Table->equiv_types($type,$other_type)) {
 	$same_keys->{$key}=$type;
-      } elsif ($type ne $other_type) {
-	$inconsistent_keys->{$key}=[$type,$other_type];
+    # } elsif ($type ne $other_type) {
       } else {
-	$self->warn("Key $key fell through classification");
+	$inconsistent_keys->{$key}=[$type,$other_type];
+	# } else {
+	# $self->warn("Key $key fell through classification");
       }
     } else {			#  !defined $other_key
       $baseline_only->{$key}=$type;
@@ -59,45 +62,3 @@ sub is_super {$_[0]->is_consistent && %{$_[0]->baseline_only}==0;}
 sub is_expanded {%{$_[0]->new_keys}>0;}
 
 1;
-
-__END__
-
-=head1 NAME
-
-Class::AutoDB::Collection - Compare two collection definitions and
-maintain differences
-
-=head1 SYNOPSIS
-
-This is a helper class for Class::AutoDB::Registry to to process
-differences between in-memory and saved registries
-
- use Class::AutoDB::CollectionDiff;
- use Class::AutoDB::Collection;
- my $diff=new Class::AutoDB::CollectionDiff
-   (-baseline=>$saved, -change=>$in_memory);
- if ($diff->is_sub) {               # is new collection subset of saved one?
-   $registry=$saved_registry;       # if so, use saved one
- } elsif  ($diff->is_different) {   # else get changes
-   my %new_keys=$diff->new_keys;    # 
-   my @expanded_collections=$diff->expanded_collections;
- } else {
-   die “New collection inconsistent with old”;
- }
-
-=head1 DESCRIPTION
-
-This class compares two collection definitions and records their
-differences. The first collection is considered the baseline, and
-differences are reported relative to it. This class I<does not talk to
-the database>.
-
-=head1 BUGS and WISH-LIST
-
-[None]
-
-=head1 METHODS and FUNCTIONS - Initialization
-
-see  L<http://search.cpan.org/~ccavnor/Class-AutoDB-0.091/docs/CollectionDiff.html#methods_and_functions>
-
-=cut

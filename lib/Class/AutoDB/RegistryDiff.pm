@@ -1,7 +1,6 @@
 package Class::AutoDB::RegistryDiff;
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS);
 use strict;
-use Data::Dumper;
 use Class::AutoClass;
 use Class::AutoDB::RegistryVersion;
 use Class::AutoDB::Collection;

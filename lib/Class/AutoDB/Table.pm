@@ -9,13 +9,14 @@ use Text::Abbrev;
 
 @AUTO_ATTRIBUTES=qw(name _keys index);
 @OTHER_ATTRIBUTES=qw(keys);
-%DEFAULTS=(_keys=>{});
+%DEFAULTS=(keys=>{});
 Class::AutoClass::declare(__PACKAGE__);
 
-sub _init_self {
-  my($self,$class,$args)=@_;
-  return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
-}
+# NG 09-03-19: commented out _init_self -- stub not needed
+# sub _init_self {
+#   my($self,$class,$args)=@_;
+#   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
+# }
 sub keys {
   my $self=shift;
   my $result= @_? $self->_keys($_[0]): $self->_keys;
@@ -54,65 +55,20 @@ sub drop {
   my $sql="drop table if exists $name";
   wantarray? ($sql): [$sql];
 }
+# NG 09-12-27: quick hack to let abbreviated types match in CollectionDiff
+# TODO: TYPE and type checking duplicated in many modules. fix this!
+sub equiv_types {
+  my $self_or_class=shift;
+  my($type0,$type1)=@_;
+  my $list0=$type0=~/^list/;
+  my $list1=$type1=~/^list/;
+  if ($list0 && $list1) {	  # both are list types. get inner types
+    ($type0)=$type0=~/^list\s*\(\s*(.*?)\s*\)/;
+    ($type1)=$type1=~/^list\s*\(\s*(.*?)\s*\)/;
+  } else {
+    return 0 if $list0 || $list1; # only one is list type, so not equiv
+  }
+  return $TYPES_ABBREV{$type0} eq $TYPES_ABBREV{$type1};
+}
 
 1;
-
-__END__
-
-=head1 NAME
-
-Class::AutoDB::Table - Schema information for one table
-
-=head1 SYNOPSIS
-
-This is a helper class for Class::AutoDB::Registry which represents the
-schema information for one table.
-
- use Class::AutoDB::Table;
- my $table=new Class::AutoDB::Table
-   (-name=>'Person',
-    -keys{name=>'string',dob=>'integer',grade_avg=>'float',friend=>'object'});
- my $name=$table->name; 
- my $keys=$table->keys;           # hash of key=>type pairs
- my @sql=$table->schema;          # SQL statements to create table
- my @sql=$table->schema('create');# same as above
- my @sql=$table->schema('drop');  # SQL statements to drop table
- my @sql=$table->schema('alter'); # SQL statements to add columns 
-                                  #   of this table to another
-
-=head1 DESCRIPTION
-
-This class represents schema information for one table. This class is
-fed a HASH of key=E<gt>type pairs. Each turns into one column of the
-table. In addition, the table has an 'object' column which is a foreign
-key pointing to the AutoDB object table and which is the primary key
-here. Indexes are defined on all keys (unless index=>0 is passed as an AutoDB 
-constructor argument). This class just creates SQL; 
-I<it does not talk to the database>.
-
-At present, only our special data types ('string', 'integer', 'float',
-'object') are supported. These can be abbreviated. These are translated
-into MySQL types as follows:
-
- ----------------------------------
- | AutoDB type    | MySQL type    |
- ----------------------------------
- |  string        |  longtext     |
- |  integer       |  int          |
- |  float         |  double       |
- |  object        |  bigint       |
- |                | (unsigned)    |
- ----------------------------------
-
-=head1 BUGS and WISH-LIST
-
-see  L<http://search.cpan.org/~ccavnor/Class-AutoDB-0.091/docs/Table.html#bugs_and_wishlist>
-
-=head1 METHODS and FUNCTIONS - Initialization
-
-see  L<http://search.cpan.org/~ccavnor/Class-AutoDB-0.091/docs/Table.html#methods_and_functions>
-
-
-
-=cut
-

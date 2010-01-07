@@ -11,10 +11,11 @@ use Class::AutoDB::Table;
 @OTHER_ATTRIBUTES=qw();
 Class::AutoClass::declare(__PACKAGE__);
 
-sub _init_self {
-  my($self,$class,$args)=@_;
-  return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
-}
+# NG 09-03-19: commented out _init_self -- stub not needed
+# sub _init_self {
+#   my($self,$class,$args)=@_;
+#   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
+# }
 # TODO: this is re-used in Database.pm.  find a single place for this.
 # TODO: this is re-used in Table.pm.  Reimplement as method
 my %TYPES=(string  =>'longtext',
@@ -33,7 +34,9 @@ sub put {
   my @values=($oid);
   while(my($key,$type)=each %keys) {
     my $value=$key_values->{$key};
-    next unless $value;
+    # NG 09-12-17: line below causes 0's to be stored as NULLs. breaks queries
+    #              selecting on 0. scary this wasn't caught earlier!
+    # next unless $value;
     push(@columns,$key);
     push(@values,$dbh->quote($value,$TYPES{$type}));
   }

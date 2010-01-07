@@ -3,7 +3,7 @@ use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS %DEFAULTS);
 use strict;
 use DBI;
 use Class::AutoClass;
-use Class::AutoClass::Args;
+# use Hash::AutoHash::Args;
 @ISA = qw(Class::AutoClass);
 
 # Cursor for AutoDB queries
@@ -14,10 +14,11 @@ use Class::AutoClass::Args;
 %DEFAULTS=(object_table=>'_AutoDB',is_started=>0);
 Class::AutoClass::declare(__PACKAGE__);
 
-sub _init_self {
-  my($self,$class,$args)=@_;
-  return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
-}
+# NG 09-03-19: commented out _init_self -- stub not needed
+# sub _init_self {
+#   my($self,$class,$args)=@_;
+#   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
+# }
 sub get {
   my($self,$n)=@_;
   $self->reset unless $self->is_started;
@@ -60,9 +61,12 @@ sub count {
   } elsif ($sql && $sth) {
     $sth->execute || $self->throw("Database error in exectue for query\n$sql\n".$dbh->errstr);
   }
+  # NG 09-12-14: was throwing error when count==0! scary this wasn't caught sooner
+  #  my($count)=$sth->fetchrow_array || 
+  #    $self->throw("Database error in fetch for query\n$sql\n".$dbh->errstr);
   my($count)=$sth->fetchrow_array || 
-    $self->throw("Database error in fetch for query\n$sql\n".$dbh->errstr);
-  $count;
+    ($dbh->err && $self->throw("Database error in fetch for query\n$sql\n".$dbh->errstr));
+  $count || 0;
 }
 sub select_sql {
   my($self)=@_;

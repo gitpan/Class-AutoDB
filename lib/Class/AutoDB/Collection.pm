@@ -11,25 +11,22 @@ use Class::AutoDB::ListTable;
 BEGIN {
   @AUTO_ATTRIBUTES=qw(name
 		      _keys _tables _cmp_data);
-  @OTHER_ATTRIBUTES=qw(register);
+  @OTHER_ATTRIBUTES=qw(keys register);
   %SYNONYMS=();
   Class::AutoClass::declare(__PACKAGE__);
 }
-sub _init_self {
-  my($self,$class,$args)=@_;
-  return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
-}
+# NG 09-03-19: commented out _init_self -- stub not needed
+# sub _init_self {
+#   my($self,$class,$args)=@_;
+#   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
+# }
 sub register {
-  my $self=shift;
-  my @registrations=_flatten(@_);
+  my($self,$new_keys)=@_;
   my $keys=$self->keys or $self->keys({});
-  for my $reg (@registrations) {
-    my $reg_keys=$reg->keys;
-    while(my($key,$type)=each %$reg_keys) {
-      $type=lc $type;
-      $keys->{$key}=$type, next unless defined $keys->{$key};
-      $self->throw("Inconsistent registrations for search key $key: types are ".$keys->{$key}." and $type") unless $keys->{$key} eq $type;
-    }
+  while(my($key,$type)=each %$new_keys) {
+    $type=lc $type;
+    $keys->{$key}=$type, next unless defined $keys->{$key};
+    $self->throw("Inconsistent registrations for search key $key: types are ".$keys->{$key}." and $type") unless $keys->{$key} eq $type;
   }
   $self->_keys($keys);
   $self->_tables(undef);	# clear computed value so it'll be recomputed next time 
@@ -58,19 +55,28 @@ sub put {
     next unless $method;
     my $value=$object->$method;
     if ($type eq 'object' && defined $value) {
-      $value=$value->oid;
+      # NG 09-12-19: $value->oid crashes on nonpersistent things. 
+      #              change also needed for cleanup of user-object namespace
+      # $value=$value->oid;
+      $value=Class::AutoDB::Serialize::obj2oid($value)
     } elsif ($type eq 'list(object)' && defined $value) {
-      # Bug fix NG 05-08-22: $value points to the list in the _REAL_ object
+      # NG 05-08-22: $value points to the list in the _REAL_ object
       #   Orginal code clobbered this list
       #   Fixed code creates new empty list and copies oids there
       my $oids=[];
-      @$oids=map {$_->oid} @$value;
+      # NG 09-12-19: $_->oid crashes on nonpersistent things. 
+      #              change also needed for cleanup of user-object namespace
+      # @$oids=map {$_->oid} @$value;
+      @$oids=map {Class::AutoDB::Serialize::obj2oid($_)} @$value;
       $value=$oids;
     }
     $key_values{$key}=$value;
   }
   # generate SQL to store object in each table
-  my $oid=$object->oid;
+  # NG 09-12-19: $object->oid. crashes on nonpersistent things. 
+  #              change also needed for cleanup of user-object namespace
+  # my $oid=$object->oid;
+  my $oid=Class::AutoDB::Serialize::obj2oid($object);
   my @sql=map {$_->put($oid,\%key_values)} $self->tables;
   wantarray? @sql: \@sql;
 }
@@ -146,68 +152,3 @@ sub _is_list_type {$_[0]=~/^list\s*\(/;}
 sub _flatten {map {'ARRAY' eq ref $_? @$_: $_} @_;}
   
 1;
-
-__END__
-
-=head1 NAME
-
-Class::AutoDB::Collection - Schema information for one collection
-
-=head1 SYNOPSIS
-
-This is a helper class for Class::AutoDB::Registry which represents the
-schema information for one collection.
-
- use Class::AutoDB::Registration;
- use Class::AutoDB::Collection;
- my $registration=new Class::AutoDB::Registration
-   (-class=>'Person',
-    -collection=>'Person',
-    -keys=>qq(name string, dob integer, significant_other object, 
-              friends list(object)),
-    -transients=>[qw(age)],
-    -auto_gets=>[qw(significant_other)]);
- 
- my $collection=new Class::AutoDB::Collection
-   (-name=>'Person',-register=>$registration);
- 
- # Get the object's attributes
- my $name=$collection->name; 
- my $keys=$collection->keys;            # hash of key=>type pairs
- my $tables=$collection->tables;        # Class::AutoDB::Table objects 
-                                        #   that implement this collection 
- 
- my @sql=$collection->schema;           # SQL statements to create collection
- my @sql=$collection->schema('create'); # same as above
- my @sql=$collection->schema('drop');   # SQL statements to drop collection
- my @sql=$collection->schema('alter',$diff); 
-                                        # SQL statements to alter collection
-                                        #   ($diff is CollectionDiff object)
-
-=head1 DESCRIPTION
-
-This class represents processed registration information for one
-collection. Registrations are fed into the class via the 'register'
-method which combines the information to obtain a single hash of
-key=E<gt>type pairs. It makes sure that if the same key is registered
-multiple times, it has the same type each time. It further processes
-the information to determine the database tables needed to implement
-the collection, and the SQL statements needed to create, and drop those
-tables. It also has the ability to compare its current state to a
-Class::AutoDB::CollectionDiff object and generate the SQL statements
-needed to alter the current schema the new one.
-
-This class I<does not talk to the database>.
-
-=head1 BUGS and WISH-LIST
-
-see  L<http://search.cpan.org/~ccavnor/Class-AutoDB-0.091/docs/Collection.html#bugs_and_wishlist> 
-
-Wish-list
-
-=head1 METHODS and FUNCTIONS
-
-see  L<http://search.cpan.org/~ccavnor/Class-AutoDB-0.091/docs/Collection.html#methods_and_functions> 
- 
-=cut
-

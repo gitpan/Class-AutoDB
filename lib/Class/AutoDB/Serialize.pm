@@ -9,12 +9,12 @@ use DBI;
 use Carp;
 #use Scalar::Util qw(weaken);
 use Scalar::Util qw(refaddr);
-use Data::Dumper;
+use Class::AutoDB::Dumper;
 @ISA = qw(Class::AutoClass); # AutoClass must be first!!
 @OTHER_ATTRIBUTES=qw(oid dbh);
 Class::AutoClass::declare(__PACKAGE__);
 
-my $DUMPER=new Data::Dumper([undef],['thaw']) ->
+my $DUMPER=new Class::AutoDB::Dumper([undef],['thaw']) ->
   Purity(1)->Indent(1)->
   Freezer('DUMPER_freeze')->Toaster('DUMPER_thaw');
 
@@ -22,11 +22,15 @@ my $GLOBALS=Class::AutoDB::Globals->instance();
 my $OID2OBJ=$GLOBALS->oid2obj;
 my $OBJ2OID=$GLOBALS->obj2oid;
 my $OID_GEN=int rand 1<<30;	# 2**30
+my $REGISTRY_OID=$GLOBALS->registry_oid;
 
 sub _init_self {
   my($self,$class,$args)=@_;
   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
-  my $oid=$self->oid || $$.$OID_GEN++;
+  # NG 09-12-19: removed ->oid for cleanup of user-object namespace. 
+  #              only needed for registry
+  # my $oid=$self->oid || $$.$OID_GEN++;
+  my $oid=ref $self eq 'Class::AutoDB::Registry'? $REGISTRY_OID: $$.$OID_GEN++;
   oid2obj($oid,$self);
   obj2oid($self,$oid);
 }
@@ -34,6 +38,16 @@ sub DUMPER_freeze {
   my($self)=@_;
   my $oid=$OBJ2OID->{refaddr $self};
   #print ">>> DUMPER_freeze ->$oid<- ($self)\n";
+
+  # NG 09-12-08: code below is on the right track, but still broken
+  # to revert back to old Data::Dumper, 
+  #   mysql: delete * from _AutoDB;
+  #   ~/local/lib/perl/x86_64-linux-thread-multi/Data: mv Dumper.pm Dumper.pm.new
+#   if ($Data::Dumper::VERSION >= 2.122) { # have to modify object itself
+#     %$self=(_OID=>$oid,_CLASS=>ref $self);
+#     bless $self,'Class::AutoDB::Oid';
+#     return $self;
+#   }
   return bless {_OID=>$oid,_CLASS=>ref $self},'Class::AutoDB::Oid';
 }
 sub oid2obj {			# allow call as object or class method, or function
@@ -54,12 +68,18 @@ sub dbh {
   $GLOBALS->dbh(@_);
 }
 sub store {
-  my($self)=@_;
+  my($self,$transients)=@_;
   $DUMPER->Reset;
   # Make a shallow copy, replacing independent objects with stored reps
   my $copy={_CLASS=>ref $self};
   while(my($key,$value)=each %$self) {
-    if (UNIVERSAL::isa($value,__PACKAGE__)) {
+    # NG 09-12-05: fixed wrong regex. Scary this wasn't caught earlier!!
+    # next if grep /$key/,@$transients;
+    next if grep {$_ eq $key} @$transients;
+    # NG 06-05-16: fixed bug. UNIVERSAL::isa reports true if arg is __name__
+    #              of Serialize subclass. here, we only want true case if arg
+    #              __object__ whose class is Serialize subclass
+    if (UNIVERSAL::isa(ref $value,__PACKAGE__)) {
       $copy->{$key}=$value->DUMPER_freeze;
     } else {
       $copy->{$key}=$value;
@@ -75,7 +95,7 @@ sub fetch {			# allow call as object or class method, or function
   my($oid)=@_;
   # three cases: (1) new oid, (2) Oid exists, (3) real object exists
   my $obj=$OID2OBJ->{$oid};
-  if (!$obj) {		                                # case 1
+  if (!defined $obj) {		                                # case 1
     $obj=really_fetch($oid) || return undef;
     $OID2OBJ->{$oid}=$obj;
     $OBJ2OID->{refaddr $obj}=$oid;
@@ -101,14 +121,20 @@ sub thaw {			# allow call as object or class method, or function
   }				                        # case 3 -- nothing more to do
   $obj;
 }
+
 sub really_store {
   my($self,$freeze)=@_;
   my($sth,$ret);
   my $dbh=$GLOBALS->dbh;
-  my $oid = obj2oid($self) || $self->oid || $OBJ2OID->{refaddr $self};
+  # NG 09-12-19: removed ->oid for cleanup of user-object namespace. 
+  #              cases other than first not needed anyway (I hope!!)
+  # my $oid = obj2oid($self) || $self->oid || $OBJ2OID->{refaddr $self};
+  my $oid=obj2oid($self);
   #print ">>> storing  ->$oid<-($self)", ref $self, "\n";
 #  $sth=$dbh->prepare(qq(insert into _AutoDB(oid,object) values (?,?)));
+
   $sth=$dbh->prepare(qq(REPLACE INTO _AutoDB(oid,object) VALUES (?,?)));
+
   $sth->bind_param(1,$oid);
   $sth->bind_param(2,$freeze);
   $ret=$sth->execute or confess $sth->errstr;
@@ -122,32 +148,67 @@ sub really_fetch {
   $ret=$sth->execute or confess $sth->errstr;
   # get id of new object
   my($freeze)=$sth->fetchrow_array;
-  unless ($freeze) {
-    confess $sth->errstr if $sth->err;
-    my $class=$obj->{_CLASS};
-    warn qq/Trying to deserialize an instance of class $class with oid \'$oid\'. Ensure that: 
-    \t 1) The object was serialized correctly (you may have forgotten to call put() on it). 
-    \t 2) You can connect to the data source in which it has been serialized.\n/;
-    return undef;
-  }
+  # NG 10-01-01: moved errstr check up from 'unless' below. since unless now commented out
+  confess $sth->errstr if $sth->err;
+  # unless ($freeze) {
+    # confess $sth->errstr if $sth->err;
+    # my $class=$obj->{_CLASS};
+    # NG 10-01-01: moved error check from really_fetch to really_thaw because there
+    #              aer other ways of getting here
+    # NG 06-05-16: changed warn to confess. calling routine dies immediately anyway
+    #              and confess output easier to catch in eval
+    # confess qq/Trying to deserialize an instance of class $class with oid \'$oid\'. Ensure that: 
+    # \t 1) The object was serialized correctly (you may have forgotten to call put() on it). 
+    # \t 2) You can connect to the data source in which it has been serialized.\n/;
+    # warn qq/Trying to deserialize an instance of class $class with oid \'$oid\'. Ensure that: 
+    # \t 1) The object was serialized correctly (you may have forgotten to call put() on it). 
+    # \t 2) You can connect to the data source in which it has been serialized.\n/;
+    # return undef;
+  # }
   really_thaw($oid,$obj,$freeze);
 }
 sub really_thaw {
   my($oid,$obj,$freeze)=@_;
+  # NG 10-01-01: moved error check from really_fetch to really_thaw because there
+  #              aer other ways of getting here
+  # NG 06-05-16: changed warn to confess. calling routine dies immediately anyway
+  #              and confess output easier to catch in eval
+   unless ($freeze) {
+     my $class=$obj->{_CLASS};
+     confess qq/Trying to deserialize an instance of class $class with oid \'$oid\'. Ensure that: 
+    \t 1) The object was serialized correctly (you may have forgotten to call put() on it). 
+    \t 2) You can connect to the data source in which it has been serialized.
+    \t 3) The object was serialized correctly\n/;
+   }
   my $thaw;			# variable used in $DUMPER
   eval $freeze;			# sets $thaw
   # if the thawed structure is circular and refers to the present object,
   # the act of thawing will have created an Oid for the present object.
   # if so, use it.
-  $obj or $obj=oid2obj($oid);
+  defined $obj or $obj=oid2obj($oid);
   # remove Oid attributes from thawed object and Oid if it exists
   my $class=$thaw->{_CLASS};
   delete @$thaw{qw(_CLASS _OID)}; 
-  delete @$obj{qw(_CLASS _OID)} if $obj;
-  $obj or $obj={};
+  delete @$obj{qw(_CLASS _OID)} if defined $obj;
+  defined $obj or $obj={};
   # copy data back from thawed structure to obj. this leaves embedded Oids un-fetched 
   @$obj{keys %$thaw}=values %$thaw;
   # bless $obj (or rebless Oid) to real class
+  # NG 06-10-31: fix old bug: use class if necessary -- scary this wasn't caught before
+  # use object's class if not already done. Body of code same as AUTOLOAD. 
+  # TODO: refactor someday
+  no strict 'refs';
+
+  # NG 09-01-14: fixed dumb ass bug: the eval "use..." below is, of course, not run 
+  #   if the class is already loaded.  This means that the value of $@ is not reset
+  #   by the eval.  So, if it had a true value before the eval, it will have the 
+  #   same value afterwards causing the error code to be run!
+  #   FIX: changed "use" to "require" (which returns true on success) and use the
+  #   return value to control whether error code run
+  # eval "use $class" unless ${$class.'::'}{AUTODB};
+  unless (${$class.'::'}{AUTODB}) {
+    eval "require $class" or die $@;
+  }
   bless $obj,$class;
 }
 
@@ -158,138 +219,3 @@ sub DESTROY {
 }
 
 1;
-
-__END__
-
-=head1 NAME
-
-Class::AutoDB::Serialize - Serialization engine for Class::AutoDB --
-MySQL only for now
-
-=head1 SYNOPSIS
-
-This is a mixin class that enables objects to be serialized and stored
-in a database as independent entities, and later fetched one-by-one or
-in groups. Whether fetched individually or in groups, the original
-shared object structure is preserved. It's not necessary for the object
-to also from Class::AutoClass, although the examples here all do.
-
-=head2 Define class that inherits from Class::AutoDB::Serialize
-
-Person class with attributes 'name', 'sex', 'hobbies', and 'friends',
-where 'friends' is a list of Persons.
-
- package Person;
- use Class::AutoClass;
- use Class::AutoDB::Serialize;
- @ISA=qw(Class::AutoClass Class::AutoDB::Serialize); 
- 
- @AUTO_ATTRIBUTES=qw(name sex hobbies friends);
- @OTHER_ATTRIBUTES=qw();
- %SYNONYMS=();
- Class::AutoClass::declare(__PACKAGE__);
- 1;
-
-=head2 Create and store some objects
-
- use DBI;
- use Class::AutoDB::Serialize;
- use Person;
- my $dbh=DBI->connect('dbi:mysql:database=ngoodman;host=localhost');
- Class::AutoDB::Serialize->dbh($dbh);
- 
- my $joe=new Person(-name=>'Joe',-sex=>'male',
-                    -hobbies=>['mountain climbing', 'sailing']);
- my $mary=new Person(-name=>'Mary',-sex=>'female',
-                     -hobbies=>['hang gliding']);
- my $bill=new Person(-name=>'Bill',-sex=>'male',
-                     -hobbies=>['cooking', 'eating', 'sleeping']);
- # Set up friends lists
- $joe->friends([$mary,$bill]);
- $mary->friends([$joe,$bill]);
- $bill->friends([$joe,$mary]);
- 
- # Store the objects
- $joe->store;
- $mary->store;
- $bill->store;
- 
- # Print their object id's so you can fetch them later
- for my $obj ($joe, $mary, $bill) {
-   print 'name=', $obj->name, ' oid=', $obj->oid, "\n";
- }
-
-=head2 Fetch the objects
-
-Assume that the oid's are passed as command line arguments
-
- my @oids=@ARGV;
- my $joe=Class::AutoDB::Serialize::fetch($ARGV[0]);
- my $mary=Class::AutoDB::Serialize::fetch($ARGV[1]);
- my $bill=Class::AutoDB::Serialize::fetch($ARGV[2]);
- # Print the objects' attributes
- for my $obj ($joe, $mary, $bill) {
-   print 'oid=', $obj->oid, "\n";
-   print 'name=', $obj->name, "\n";
-   print 'sex=', $obj->sex, "\n";
-   print 'hobbies=', join(', ',@{$obj->hobbies}), "\n";
-   print 'friends=',"\n";
- for my $friend (@{$obj->friends}) {
-   print ' oid=', $friend->oid, ', ';
-   print 'name=', $friend->name, "\n";
- }
- print "----------\n";
- }
- # Change an attribute in each object to demonstrate 
- # that shared structure is preserved
- for my $obj ($joe, $mary, $bill) {
-   $obj->name($obj->name.' Changed');
- }
- for my $obj ($joe, $mary, $bill) {
-   print 'oid=', $obj->oid, "\n";
-   print 'changed name=', $obj->name, "\n";
-   print 'friends=',"\n";
-   for my $friend (@{$obj->friends}) {
-     print ' oid=', $friend->oid, ', ';
-     print 'changed name=', $friend->name, "\n";
-   }
-   print "----------\n";
- }
-
-=head1 DESCRIPTION
-
-This is a mixin class that implements the serialization and data
-storage engine for Class::AutoDB. Objects that inherit from this class
-can be serialized and stored in a database as independent entities.
-This only works for objects implemented as HASHes in the usual Perl
-way.
-
-What distinguishes Class::AutoDB::Serialize from the many other
-excellent Perl serialization packages (eg, Data::Dumper, Storable,
-YAML) is that we serialize objects as independent entities existing
-within a large network, rather than serializing entire networks as a
-whole. When an object is being serialized, other
-E<ldquo>auto-serializableE<rdquo> objects that are encountered are not
-serialized then and there; instead a placeholder object called an Oid
-(short for I<object identifier>) is emitted into the serialization
-stream. When the object is later fetched, the placeholders are not
-immediately fetched; instead each placeholder is fetched transparently
-when the program invokes a method on it (this is accomplished via an
-AUTOLOAD mechanism).
-
-The purpose of all this is to make it easy for Perl programs to operate
-on large databases of objects. Objects can be created, stored, and
-later fetched. If the object points to other objects, they will be
-fetched when needed. New objects can be created, connected to the
-network of existing objects, and stored.
-
-=head1 BUGS and WISH-LIST
-
-see  L<http://search.cpan.org/~ccavnor/Class-AutoDB-0.091/docs/Serialize.html#bugs_and_wishlist>
-
-
-=head1 METHODS and FUNCTIONS - Initialization
-
-see  L<http://search.cpan.org/~ccavnor/Class-AutoDB-0.091/docs/Serialize.html#methods_and_functions>
-
-=cut

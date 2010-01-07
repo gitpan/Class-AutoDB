@@ -1,0 +1,29 @@
+Class-AutoDB/t/README
+
+The 't' directory includes separate 'user' and 'developer' test
+suites.  
+
+The user tests are in the top level 't' directory, ie, this
+one. 'Build test' runs these tests.  These tests require read-write
+access to a MySQL database and the ability to create an SDBM file in
+the test directories. Build.PL checks these requirements and does not
+create the Build script unless they are met. CPAN testing reports such
+cases as "status UNKNOWN".
+
+The developer tests are in the 'Developer' subdirectory tree.  There
+are tests for each major component in separate trees under
+'Developer'.
+
+Most tests (in both suites) consist of multiple scripts that must be
+run in sequence. Typically the first script creates the AutoDB
+database and stores some data, and the next script retrieves the data.
+Further subtests might modify the data and store it back, and then
+retrieve the modified data.  We run these steps as separate programs
+to make sure the data is really persistent.
+
+We implement these compound tests by a (typically very simple) top
+level script that runs the subtests, and put the subtests themelves in
+a subdirectory with the same name (minus the '.t' suffix).  The user
+tests and newly written developer tests follow this pattern; we are
+slowly migrating old developer tests over.
+

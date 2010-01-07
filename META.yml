@@ -1,22 +1,83 @@
-#XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
-name:         Class-AutoDB
-version:      0.091
-version_from: lib/Class/AutoDB.pm
-installdirs:  site
+---
+name: Class-AutoDB
+version: 1.09_01
+author:
+  - 'Nat Goodman <natg@shore.net>'
+abstract: Almost automatic object persistence coexisting with human-engineered database
+license: perl
+resources:
+  license: http://dev.perl.org/licenses/
+build_requires:
+  Carp: 0
+  Class::AutoClass: 1.53
+  Cwd: 3.26
+  DBI: 1.604
+  Data::Rmap: 0.61
+  Exporter: 5.58
+  ExtUtils::CBuilder: 0.22
+  File::Basename: 0
+  File::Spec: 3.26
+  File::Spec::Functions: 3.26
+  FindBin: 0
+  Getopt::Long: 2.13
+  Hash::AutoHash::Args: 1.11
+  List::MoreUtils: 0.09
+  List::Util: 1.14
+  SDBM_File: 0
+  Scalar::Util: 1.01
+  Storable: 2.16
+  TAP::Harness: 3.12
+  Test::Deep: 0.098
+  Test::More: 0.88
 requires:
-    YAML:                          0
-    Error:                         0.15
-    Class::Singleton:              0
-    Test::More:                    0.45
-    Set::Scalar:                   0
-    DBD::mysql:                    2.9002
-    Class::WeakSingleton:          1.03
-    Text::Abbrev:                  0
-    Class::AutoClass:              0.09
-    Test::Deep:                    0
-    Storable:                      2.06
-    IO::Scalar:                    2.104
-    Data::Dumper:                  2.12
-
-distribution_type: module
-generated_by: ExtUtils::MakeMaker version 6.12
+  Carp: 0
+  Class::AutoClass: 1.53
+  Class::Singleton: 1.04
+  DBI: 1.604
+  Hash::AutoHash::Args: 1.11
+  Scalar::Util: 1.01
+  Text::Abbrev: 1.01
+configure_requires:
+  Module::Build: 0.34
+provides:
+  Class::AutoDB:
+    file: lib/Class/AutoDB.pm
+    version: 1.09_01
+  Class::AutoDB::BaseTable:
+    file: lib/Class/AutoDB/BaseTable.pm
+  Class::AutoDB::Collection:
+    file: lib/Class/AutoDB/Collection.pm
+  Class::AutoDB::CollectionDiff:
+    file: lib/Class/AutoDB/CollectionDiff.pm
+  Class::AutoDB::Connect:
+    file: lib/Class/AutoDB/Connect.pm
+  Class::AutoDB::Cursor:
+    file: lib/Class/AutoDB/Cursor.pm
+  Class::AutoDB::Database:
+    file: lib/Class/AutoDB/Database.pm
+  Class::AutoDB::Dumper:
+    file: lib/Class/AutoDB/Dumper.pm
+  Class::AutoDB::Globals:
+    file: lib/Class/AutoDB/Globals.pm
+  Class::AutoDB::ListTable:
+    file: lib/Class/AutoDB/ListTable.pm
+  Class::AutoDB::Object:
+    file: lib/Class/AutoDB/Object.pm
+  Class::AutoDB::Oid:
+    file: lib/Class/AutoDB/Oid.pm
+  Class::AutoDB::Registration:
+    file: lib/Class/AutoDB/Registration.pm
+  Class::AutoDB::Registry:
+    file: lib/Class/AutoDB/Registry.pm
+  Class::AutoDB::RegistryDiff:
+    file: lib/Class/AutoDB/RegistryDiff.pm
+  Class::AutoDB::RegistryVersion:
+    file: lib/Class/AutoDB/RegistryVersion.pm
+  Class::AutoDB::Serialize:
+    file: lib/Class/AutoDB/Serialize.pm
+  Class::AutoDB::Table:
+    file: lib/Class/AutoDB/Table.pm
+generated_by: Module::Build version 0.34
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
