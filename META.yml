@@ -1,6 +1,6 @@
 ---
 name: Class-AutoDB
-version: 1.09_01
+version: 1.09_02
 author:
   - 'Nat Goodman <natg@shore.net>'
 abstract: Almost automatic object persistence coexisting with human-engineered database
@@ -11,6 +11,7 @@ build_requires:
   Carp: 0
   Class::AutoClass: 1.53
   Cwd: 3.26
+  DBD::mysql: 4.007
   DBI: 1.604
   Data::Rmap: 0.61
   Exporter: 5.58
@@ -33,6 +34,7 @@ requires:
   Carp: 0
   Class::AutoClass: 1.53
   Class::Singleton: 1.04
+  DBD::mysql: 4.007
   DBI: 1.604
   Hash::AutoHash::Args: 1.11
   Scalar::Util: 1.01
@@ -42,7 +44,7 @@ configure_requires:
 provides:
   Class::AutoDB:
     file: lib/Class/AutoDB.pm
-    version: 1.09_01
+    version: 1.09_02
   Class::AutoDB::BaseTable:
     file: lib/Class/AutoDB/BaseTable.pm
   Class::AutoDB::Collection:

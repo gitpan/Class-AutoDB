@@ -9,7 +9,7 @@ object.  The persistence mechanism preserves the structure of the
 object network: if objects A and B pointed to C when they were stored,
 the retrieval process will reconstruct this relationship.
 
-This class presently works only with MySQL.  
+This class presently works only with MySQL. 
 
 CAUTION: This module is old. We use it internally, and while it works
 well for our purposes, we urge new users to heed the warnings in the
@@ -37,13 +37,21 @@ To install this module, run the following commands:
 	./Build test
 	./Build install
 
+The first step, 'perl Build.PL', makes sure that MySQL is available
+and that the preson doing the installation has sufficient privileges
+to run the test suite. If this check fails, Build.PL does not generate
+the Build script and exits with a 0 return code. This is the idiom
+recommended for automated CPAN testing but may be too severe for
+normal installs.
+
 The module includes a modified version of Data::Dumper, renamed
 Class::AutoDB::Dumper.  We include both the pure Perl and much faster
-C (.xs) implementations. You need a C compiler to compile the C
-implementation. We get a few compiler warnings when compiling
-Dumper.xs. These seem benign and can be ignored. The Data::Dumper docs
-claim that the code will fall back to the pure Perl implementation if
-the C version is not available.  We haven't checked this claim.
+C (.xs) implementations. Build automatically compiles the C
+implementation if your system has a C compiler. We see a few compiler
+warnings when Build does this. These seem benign and can be
+ignored. The Data::Dumper docs claim that the code will fall back to
+the pure Perl implementation if the C version is not available.  We
+haven't checked this claim.
 
 SUPPORT AND DOCUMENTATION
 

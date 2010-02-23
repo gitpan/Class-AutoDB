@@ -1,5 +1,12 @@
 Revision history for Class-AutoDB
 
+1.09_02	2010-02-23 - Trial version on the way to 1.10
+	Changes to Build.PL for better handling of MySQL dependency. not sure either
+	of these are necessary or even help...
+	- added DBD::mysql to prereqs
+	- put DBI->connect inside eval to catch error when DBD::mysql not installed
+	Removed Dumper.o from distro tarball
+
 1.09_01	2009-12-01 - Trial version on the way to 1.10
 	Brings CPAN version up-to-date with version used internally
         New features:

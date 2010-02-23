@@ -22,6 +22,7 @@ my $builder = $class->new
    build_requires =>   {'Carp' => 0,
 			'Class::AutoClass' => 1.53,
 			'Cwd' => 3.26,
+			'DBD::mysql' => 4.007,
 			'DBI' => 1.604,
 			'Data::Rmap' => 0.61,
 			'Exporter' => 5.58,
@@ -44,6 +45,7 @@ my $builder = $class->new
    requires =>         {'Carp' => 0,
 			'Class::AutoClass' => 1.53,
 			'Class::Singleton' => 1.04,
+			'DBD::mysql' => 4.007,
 			'DBI' => 1.604,
 			'Hash::AutoHash::Args' => 1.11,
 			'Scalar::Util' => 1.01,
@@ -101,10 +103,13 @@ $builder->create_build_script();
 # return error string if not
 sub chk_mysql {
   # make sure we can talk to MySQL
-  my $dbh=DBI->connect("dbi:mysql:",undef,undef,
-		       {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,})
-    or return $DBI::errstr;
-  
+  my $dbh;
+  eval
+    {$dbh=DBI->connect("dbi:mysql:",undef,undef,
+		       {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,})};
+  return $@ if $@;
+  return $DBI::errstr unless $dbh;
+
   # try to create database if necessary, then use it
   # don't worry about create-errors: may be able to use even if can't create
   $dbh->do(qq(CREATE DATABASE IF NOT EXISTS $test_db));
