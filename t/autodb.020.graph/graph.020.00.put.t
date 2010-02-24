@@ -17,15 +17,21 @@ my $autodb=new Class::AutoDB(database=>'test',create=>1);
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 tie_oid('create');
 
-do_test('chain');
-do_test('star');
-do_test('binary_tree',-depth=>5);
-do_test('ternary_tree',-depth=>5);
-do_test('cycle');
-do_test('clique',-nodes=>20);
-do_test('cone_graph');
-do_test('grid');
-do_test('torus');
+# some of these graphs are very big. make sure max_allowed_packet big enough
+if (max_allowed_packet_ok()) {
+  do_test('chain');
+  do_test('star');
+  do_test('binary_tree',-depth=>5);
+  do_test('ternary_tree',-depth=>5);
+  do_test('cycle');
+  do_test('clique',-nodes=>20);
+  do_test('cone_graph');
+  do_test('grid');
+  do_test('torus');
+} else {
+  diag "tests skipped: max_allowed_packet could not be set to big enough value";
+  ok(1);			# need at least 1 test to run
+}
 
 done_testing();
 

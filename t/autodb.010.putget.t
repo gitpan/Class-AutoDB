@@ -1,5 +1,6 @@
 use t::lib;
 use strict;
+use Config;
 use Getopt::Long;
 use File::Basename qw(fileparse);
 use File::Spec;
@@ -22,7 +23,16 @@ my @testfiles;
 ########################################
 # this sections deals w/ 010 basic putget tests
 my $testfile=File::Spec->catfile($testdir,scriptcode.'.010.01.get.t');
-my $count_get=`perl -Mblib $testfile count`;
+
+# my $count_get=`perl -Mblib $testfile count`;
+# code below copied from perlvar
+my $secure_perl_path = $Config{perlpath};
+if ($^O ne 'VMS')
+  {$secure_perl_path .= $Config{_exe} unless $secure_perl_path =~ m/$Config{_exe}$/i;}
+#####
+# invoke perl via full (secure) path. provide defualt just in case...
+my $count_get=`$secure_perl_path -Mblib $testfile count` || 17;
+
 my @files=
   ('putget.010.00.put.t put',
    # do all 3 query types for first case

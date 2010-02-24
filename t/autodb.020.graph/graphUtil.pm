@@ -2,12 +2,13 @@ package graphUtil;
 use t::lib;
 use strict;
 use Carp;
+use Test::More;
 use autodbUtil;
 use Exporter();
 
 our @ISA=qw(Exporter);
 our @EXPORT=(@autodbUtil::EXPORT,
-	     qw($class2colls $class2transients $coll2keys label %test_args
+	     qw($class2colls $class2transients $coll2keys label %test_args max_allowed_packet_ok
                 chain star binary_tree ternary_tree cycle clique cone_graph grid torus
 	     ));
 # class2colls for all classes in graph tests
@@ -40,6 +41,24 @@ sub label {
 
 our %test_args=(class2colls=>$class2colls,class2transients=>$class2transients,
 		coll2keys=>$coll2keys,label=>\&label);
+
+
+# some of these graphs are very big. make sure max_allowed_packet big enough
+# value used here (2 MB) determined empirically. may have to change if graphs change!!
+sub max_allowed_packet_ok {
+  my($name,$max_allowed_packet)=
+    dbh->selectrow_array(qq(SHOW VARIABLES LIKE 'max_allowed_packet'));
+  note "max_allowed_packet initial value=$max_allowed_packet";
+  my $min=2*1024*1024;
+  unless ($max_allowed_packet>=$min) {
+    dbh->do(qq(SET max_allowed_packet=$min));
+    ($name,$max_allowed_packet)=
+      dbh->selectrow_array(qq(SHOW VARIABLES LIKE 'max_allowed_packet'));
+    note "max_allowed_packet after set=$max_allowed_packet";
+    return 0 unless $max_allowed_packet>=$min; # fail if it didn't work...
+  }
+  $max_allowed_packet;
+}
 
 ################################################################################
 # Functions below here are for making test graphs

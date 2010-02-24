@@ -10,7 +10,7 @@ use Class::AutoDB::Connect;
 use Class::AutoDB::Database;
 use Class::AutoDB::Registry;
 use Class::AutoDB::RegistryDiff;
-our $VERSION = '1.09_02';
+our $VERSION = '1.09_03';
 $VERSION=eval $VERSION;		# I think this is the accepted idiom..
 
 # NG 09-11-24: move Database first so AutoClass::get will not mask Database::get
@@ -105,11 +105,17 @@ sub put {
   my $self=shift;
   my $registry=$self->registry;
   for my $obj (@_) {
-    next if $obj==$registry;	# registry takes care of itself
+    # NG 10-02-24: moved this line because
+    #              (1) registry never exists as Oid
+    #              (2) in perl 5.10, '==' forces stringify
+    # next if $obj==$registry;	# registry takes care of itself
     # NG 09-12-19: this line now needed because we stopped doing $obj->put
     #              (Oid has 'put' method that skips the store)
     next if UNIVERSAL::isa($obj,'Class::AutoDB::Oid');
-    # $obj->put;	                # TODO: don't invoke put method - pollutes namespace!
+    # NOTE: overload man page suggests comparing refaddrs instead of object.
+    #       but comparing objects seems to work, provided $obj NOT Oid!!
+    next if $obj==$registry;	# registry takes care of itself. 
+    # $obj->put;	        # TODO: don't invoke put method - pollutes namespace!
     # NG 09-12-19: crude 1st attempt to move logic out of user-object
     my $transients=$registry->class2transients(ref $obj);
     my $collections=$registry->class2collections(ref $obj);
