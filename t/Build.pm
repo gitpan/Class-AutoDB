@@ -49,6 +49,8 @@ sub run_tap_harness {
   $agg->stop();
   $fmt->summary($agg);
   
+  # NG 10-02-26: in new versions of Module::Build, method returns $agg
+  $agg
 }
 
 1;

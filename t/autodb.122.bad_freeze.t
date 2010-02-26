@@ -16,12 +16,12 @@ my $autodb=new Class::AutoDB(-database=>'test'); # open database
 my $dbh=$autodb->dbh;
 my($name,$max_allowed_packet)=
   $dbh->selectrow_array(qq(SHOW VARIABLES LIKE 'max_allowed_packet'));
-note "max_allowed_packet initial value=$max_allowed_packet";
+diag "max_allowed_packet initial value=$max_allowed_packet";
 my $min=6*1024*1024;
 unless ($max_allowed_packet>=$min) {
   $dbh->do(qq(SET max_allowed_packet=$min));
-  ($name,$max_allowed_packet)=dbh->selectrow_array(qq(SHOW VARIABLES LIKE 'max_allowed_packet'));
-  note "max_allowed_packet after set=$max_allowed_packet";
+  ($name,$max_allowed_packet)=$dbh->selectrow_array(qq(SHOW VARIABLES LIKE 'max_allowed_packet'));
+  diag "max_allowed_packet after set=$max_allowed_packet";
   # skip tests if didn't work
   unless ($max_allowed_packet>=$min) {
     diag "tests skipped: max_allowed_packet could not be set to big enough value";

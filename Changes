@@ -1,5 +1,13 @@
 Revision history for Class-AutoDB
 
+1.09_04	2010-02-26 - Trial version on the way to 1.10
+	Bug fixes in tests:
+	- changed 'note' to 'diag' in several tests to get more information
+	  from testers
+	- fixed simple coding error in autodb.122.bad_freeze.t ('dbh' to '$dbh')
+        - return aggregate in t::Build::run_tap_harness (overrides method from
+	  Module::Build) as new versions of Module::Build require this
+
 1.09_03	2010-02-24 - Trial version on the way to 1.10
 	Changes to Build.PL
 	- added Tie::ToObject to prereqs

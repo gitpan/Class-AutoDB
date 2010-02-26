@@ -48,13 +48,13 @@ our %test_args=(class2colls=>$class2colls,class2transients=>$class2transients,
 sub max_allowed_packet_ok {
   my($name,$max_allowed_packet)=
     dbh->selectrow_array(qq(SHOW VARIABLES LIKE 'max_allowed_packet'));
-  note "max_allowed_packet initial value=$max_allowed_packet";
+  diag "max_allowed_packet initial value=$max_allowed_packet";
   my $min=2*1024*1024;
   unless ($max_allowed_packet>=$min) {
     dbh->do(qq(SET max_allowed_packet=$min));
     ($name,$max_allowed_packet)=
       dbh->selectrow_array(qq(SHOW VARIABLES LIKE 'max_allowed_packet'));
-    note "max_allowed_packet after set=$max_allowed_packet";
+    diag "max_allowed_packet after set=$max_allowed_packet";
     return 0 unless $max_allowed_packet>=$min; # fail if it didn't work...
   }
   $max_allowed_packet;

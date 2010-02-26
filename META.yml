@@ -1,6 +1,6 @@
 ---
 name: Class-AutoDB
-version: 1.09_03
+version: 1.09_04
 author:
   - 'Nat Goodman <natg@shore.net>'
 abstract: Almost automatic object persistence coexisting with human-engineered database
@@ -46,7 +46,7 @@ configure_requires:
 provides:
   Class::AutoDB:
     file: lib/Class/AutoDB.pm
-    version: 1.09_03
+    version: 1.09_04
   Class::AutoDB::BaseTable:
     file: lib/Class/AutoDB/BaseTable.pm
   Class::AutoDB::Collection:
