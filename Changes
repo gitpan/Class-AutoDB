@@ -1,5 +1,9 @@
 Revision history for Class-AutoDB
 
+1.10	 2010-03-01
+ 	 Production release
+	 No changes from 1.09_04
+
 1.09_04	2010-02-26 - Trial version on the way to 1.10
 	Bug fixes in tests:
 	- changed 'note' to 'diag' in several tests to get more information
