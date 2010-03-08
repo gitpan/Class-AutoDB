@@ -12,23 +12,25 @@ use autodbRunTests;
 
 # make sure max_allowed_packet big enough. code adapted from graphUtil
 # value used here (6 MB) determined empirically. may have to change if graphs change!!
+# NG 10-03-08: turns out that changing max_allowed_packet has no effect despite
+#              what the MySQL documentations says...
 my $autodb=new Class::AutoDB(-database=>'test'); # open database
 my $dbh=$autodb->dbh;
 my($name,$max_allowed_packet)=
   $dbh->selectrow_array(qq(SHOW VARIABLES LIKE 'max_allowed_packet'));
-diag "max_allowed_packet initial value=$max_allowed_packet";
+diag "max_allowed_packet=$max_allowed_packet";
 my $min=6*1024*1024;
 unless ($max_allowed_packet>=$min) {
-  $dbh->do(qq(SET max_allowed_packet=$min));
-  ($name,$max_allowed_packet)=$dbh->selectrow_array(qq(SHOW VARIABLES LIKE 'max_allowed_packet'));
-  diag "max_allowed_packet after set=$max_allowed_packet";
-  # skip tests if didn't work
-  unless ($max_allowed_packet>=$min) {
-    diag "tests skipped: max_allowed_packet could not be set to big enough value";
-    ok(1);			# need at least 1 test to run
-    done_testing();
-    exit;
-  }
+  # $dbh->do(qq(SET max_allowed_packet=$min));
+  # ($name,$max_allowed_packet)=$dbh->selectrow_array(qq(SHOW VARIABLES LIKE 'max_allowed_packet'));
+  # diag "max_allowed_packet after set=$max_allowed_packet";
+  # # skip tests if didn't work
+  # unless ($max_allowed_packet>=$min) {
+  diag "max_allowed_packet=$max_allowed_packet too small. must be >= $min";
+  ok(1);			# need at least 1 test to run
+  done_testing();
+  exit;
 }
+# }
 
 runtests_main();

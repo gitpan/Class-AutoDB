@@ -45,17 +45,22 @@ our %test_args=(class2colls=>$class2colls,class2transients=>$class2transients,
 
 # some of these graphs are very big. make sure max_allowed_packet big enough
 # value used here (2 MB) determined empirically. may have to change if graphs change!!
+# NG 10-03-08: turns out that changing max_allowed_packet has no effect despite
+#              what the MySQL documentations says...
 sub max_allowed_packet_ok {
   my($name,$max_allowed_packet)=
     dbh->selectrow_array(qq(SHOW VARIABLES LIKE 'max_allowed_packet'));
-  diag "max_allowed_packet initial value=$max_allowed_packet";
+  diag "max_allowed_packet=$max_allowed_packet";
   my $min=2*1024*1024;
   unless ($max_allowed_packet>=$min) {
-    dbh->do(qq(SET max_allowed_packet=$min));
-    ($name,$max_allowed_packet)=
-      dbh->selectrow_array(qq(SHOW VARIABLES LIKE 'max_allowed_packet'));
-    diag "max_allowed_packet after set=$max_allowed_packet";
-    return 0 unless $max_allowed_packet>=$min; # fail if it didn't work...
+    # dbh->do(qq(SET max_allowed_packet=$min));
+    # ($name,$max_allowed_packet)=
+    #    dbh->selectrow_array(qq(SHOW VARIABLES LIKE 'max_allowed_packet'));
+    #  diag "max_allowed_packet after set=$max_allowed_packet";
+    # return 0 unless $max_allowed_packet>=$min; # fail if it didn't work...
+#   }
+    diag "max_allowed_packet=$max_allowed_packet too small. must be >= $min";
+    return 0;
   }
   $max_allowed_packet;
 }

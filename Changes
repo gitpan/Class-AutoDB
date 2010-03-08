@@ -1,8 +1,20 @@
 Revision history for Class-AutoDB
 
-1.10	 2010-03-01
- 	 Production release
-	 No changes from 1.09_04
+1.10	2010-03-08
+	Changes to build and test process only.
+	Changes to Build.PL:
+	- added DBD, DBI::mysql, plus some others to configure_requires. thanks 
+	  to CPAN testers for finding this problem
+	Changes in tests:
+	- more screwing around with MySQL's max_allowed_packet variable. this
+	  limits the size of the biggest object that can be stored. I have come
+	  to learn that setting this variable has no effect, even though the
+	  MySQL documentation claims that it is a session variable. recent
+	  versions of the docs correct this misconception...
+
+1.10	2010-03-01
+ 	Production release
+	No changes from 1.09_04
 
 1.09_04	2010-02-26 - Trial version on the way to 1.10
 	Bug fixes in tests:
@@ -13,7 +25,7 @@ Revision history for Class-AutoDB
 	  Module::Build) as new versions of Module::Build require this
 
 1.09_03	2010-02-24 - Trial version on the way to 1.10
-	Changes to Build.PL
+	Changes to Build.PL:
 	- added Tie::ToObject to prereqs
         Bug fixes:
 	- in perl 5.10, '==' comparison in AutoDB::put was forcing stringify when
