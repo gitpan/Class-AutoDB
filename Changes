@@ -1,6 +1,19 @@
 Revision history for Class-AutoDB
 
-1.10	2010-03-08
+1.20	2010-TBD
+        New features:
+	- 'del' method to delete objects
+        - queries ('get', 'find', 'count') with no arguments retrieve/count all
+	  objects. makes it possible to retrieve objects without defining
+	  collections
+	- raw SQL can be used in queries ('get', 'find', 'count')
+        Bug fixes:
+	- drop views everywhere that we drop tables, so views will not get in
+	  way when we create tables. (arises because DROP TABLE only drops 
+	  tables, not views)
+	Many small cleanups in code and tests
+
+1.11	2010-03-08
 	Changes to build and test process only.
 	Changes to Build.PL:
 	- added DBD, DBI::mysql, plus some others to configure_requires. thanks 
@@ -13,42 +26,7 @@ Revision history for Class-AutoDB
 	  versions of the docs correct this misconception...
 
 1.10	2010-03-01
- 	Production release
-	No changes from 1.09_04
-
-1.09_04	2010-02-26 - Trial version on the way to 1.10
-	Bug fixes in tests:
-	- changed 'note' to 'diag' in several tests to get more information
-	  from testers
-	- fixed simple coding error in autodb.122.bad_freeze.t ('dbh' to '$dbh')
-        - return aggregate in t::Build::run_tap_harness (overrides method from
-	  Module::Build) as new versions of Module::Build require this
-
-1.09_03	2010-02-24 - Trial version on the way to 1.10
-	Changes to Build.PL:
-	- added Tie::ToObject to prereqs
-        Bug fixes:
-	- in perl 5.10, '==' comparison in AutoDB::put was forcing stringify when
-	  applied to Oids. fixed by moving '==' after check for Oid.
-	Bug fixes in tests:
-	- in autodb.010.putget.t, now invoke perl via full (secure) path rather
-	  than just 'perl'
-	- in graph.020 tests, skip tests unless max_allowed_packet big enough
-	  (long term solution added to release 1.20 plan)
-	- in bad_freeze tests, skip tests unless max_allowed_packet big enough
-	  (long term solution added to release 1.20 plan)
-	
-
-1.09_02	2010-02-23 - Trial version on the way to 1.10
-	Changes to Build.PL for better handling of MySQL dependency. not sure 
-	either of these are necessary or even help...
-	- added DBD::mysql to prereqs
-	- put DBI->connect inside eval to catch error when DBD::mysql not
-	  installed
-	Removed Dumper.o from distro tarball
-
-1.09_01	2009-12-01 - Trial version on the way to 1.10
-	Brings CPAN version up-to-date with version used internally
+	Brings CPAN version up-to-date with version used internally at ISB
         New features:
         - 'put' method added to AutoDB (in Class::AutoDB::Database) to store
            specific objects. this is a step towards cleaning up namespace of
@@ -63,6 +41,8 @@ Revision history for Class-AutoDB
 	- connection management (connect, reconnect, etc) made consistent
 	- 'renew' made consistent with 'new'
         Bug fixes:
+	- in perl 5.10, '==' comparison in AutoDB::put was forcing stringify when
+	  applied to Oids. fixed by moving '==' after check for Oid.
         - 'exists' (in Class::AutoDB::Database) now checks for empty
           _AutoDB table; this may address common problem where AutoDB
           appears to exists, but registry does not exist
@@ -90,6 +70,26 @@ Revision history for Class-AutoDB
         - keys declared with abbreviated types were not always being seen as
 	  equivalent (eg, 'int' vs. 'integer'
 	- programmatic definition of collections now works
+	Changes to Build process
+	- added Tie::ToObject to prereqs
+	- changes to Build.PL for better handling of MySQL dependency. not sure 
+	  either of these are necessary or even help...
+	- added DBD::mysql to prereqs
+	- put DBI->connect inside eval to catch error when DBD::mysql not
+	  installed
+	- removed Dumper.o from distro tarball
+	Bug fixes in tests:
+	- changed 'note' to 'diag' in several tests to get more information
+	  from testers
+	- fixed simple coding error in autodb.122.bad_freeze.t ('dbh' to '$dbh')
+        - return aggregate in t::Build::run_tap_harness (overrides method from
+	  Module::Build) as new versions of Module::Build require this
+	- in autodb.010.putget.t, now invoke perl via full (secure) path rather
+	  than just 'perl'
+	- in graph.020 tests, skip tests unless max_allowed_packet big enough
+	  (long term solution added to release 1.20 plan)
+	- in bad_freeze tests, skip tests unless max_allowed_packet big enough
+	  (long term solution added to release 1.20 plan)
 
 0.1     06-01-04
 	- in Oid, added code to 'use' classes when object is fetched

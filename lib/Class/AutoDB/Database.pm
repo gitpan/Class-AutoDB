@@ -46,75 +46,90 @@ sub count {
   my $cursor=new Class::AutoDB::Cursor(-query=>$query,-dbh=>$self->dbh);
   $cursor->count;
 }
+# NG 10-09-15: moved some code around to handle empty query and raw SQL
 sub parse_query {
   my $self=shift;
   my $args=new Hash::AutoHash::Args(@_);
-  my $name=$args->collection;
-  delete $args->{collection};	# so 'collection' will not be confused with a search key!
-  my $query=$args->query? $args->query: $args;
   # NG 09-12-19: $autodb needed to remove $value->oid below
   my $autodb=$GLOBALS->autodb;
   my $dbh=$self->dbh;
   my $object_table=$self->object_table;
-  my $collection=$self->registry->collection($name) || $self->throw("Unknown collection $name");
-  my $keys=$collection->keys;
-  # NG 09-12-18: rewrote to avoid duplicates when selecting from list
-  #              and to omit base table when keys are all lists
-  my (@base_where,@list_selects,$limit);
-  while(my($key,$value)=each %$query) {	# create SQL condition for each search key
-    if ($key eq '_limit_') { # reserved keyword
-      $limit = $value;
-      next;
-    }
-    my $type=$keys->{$key} || $self->throw("Unknown key $key for collection $name");
-    if (($type eq 'object' || $type eq 'list(object)') && defined $value) {
-      # NG 09-12-19: $value->oid crashes on nonpersistent things. 
-      #              change also needed for cleanup of user-object namespace
-      # $value=$value->oid;
-      # $value=Class::AutoDB::Serialize::obj2oid($value)
-      # NG 09-12-22: handle repeated search terms for list(object)
-      if ('ARRAY' eq ref $value) {
-	$value=[map {Class::AutoDB::Serialize::obj2oid($_)} @$value];
-      } else {
-	$value=Class::AutoDB::Serialize::obj2oid($value)
+  my @from=($object_table);	# always need_AutoDB
+  # NG 10-09-13: added 'IS NOT NULL' to handle deleted objects
+  my @where=qq($object_table.object IS NOT NULL);
+  # NG 10-09-15: added support for raw SQL
+  my $sql=$args->sql;
+  delete $args->{sql};        # so 'sql' will not be confused with a search key!
+  push(@where,"$object_table.oid IN ($sql)") if $sql;
+  my $limit;			# may be set in 'then' below
+  if (%$args) {
+    my $name=$args->collection;
+    delete $args->{collection};	# so 'collection' will not be confused with a search key!
+    my $query=$args->query? $args->query: $args;
+    my $collection=$self->registry->collection($name) || $self->throw("Unknown collection $name");
+    my $keys=$collection->keys;
+    # NG 09-12-18: rewrote to avoid duplicates when selecting from list
+    #              and to omit base table when keys are all lists
+    my(@base_where,@list_selects);
+    while(my($key,$value)=each %$query) {	# create SQL condition for each search key
+      if ($key eq '_limit_') { # reserved keyword
+	$limit = $value;
+	next;
       }
-    }
-    my($db_type,$list_type,$table);
-    if ($type=~/^list/) {
-      # legal to have repeated search terms for list
-      my @values='ARRAY' eq ref $value? @$value: ($value);
-      ($list_type)=$type=~/^list\s*\(\s*(.*)\s*\)/;
-      $db_type=$TYPES{$list_type};
+      my $type=$keys->{$key} || $self->throw("Unknown key $key for collection $name");
+      if (($type eq 'object' || $type eq 'list(object)') && defined $value) {
+	# NG 09-12-19: $value->oid crashes on nonpersistent things. 
+	#              change also needed for cleanup of user-object namespace
+	# $value=$value->oid;
+	# $value=Class::AutoDB::Serialize::obj2oid($value)
+	# NG 09-12-22: handle repeated search terms for list(object)
+	if ('ARRAY' eq ref $value) {
+	  $value=[map {Class::AutoDB::Serialize::obj2oid($_)} @$value];
+	} else {
+	  $value=Class::AutoDB::Serialize::obj2oid($value)
+	}
+      }
+      my($db_type,$list_type,$table);
+      if ($type=~/^list/) {
+	# legal to have repeated search terms for list
+	my @values='ARRAY' eq ref $value? @$value: ($value);
+	($list_type)=$type=~/^list\s*\(\s*(.*)\s*\)/;
+	$db_type=$TYPES{$list_type};
         for my $value (@values) {
-	$table=$name."_$key";	# list keys are stored in separate tables
-	my $list_select=qq(SELECT $table.oid FROM $table WHERE ); 
+	  $table=$name."_$key";	# list keys are stored in separate tables
+	  my $list_select=qq(SELECT $table.oid FROM $table WHERE ); 
+	  if (defined $value) {
+	    $value=$dbh->quote($value,$db_type);
+	    $list_select.="$table.$key=$value";
+	  } else {
+	    $list_select.="$table.$key IS NULL";
+	  }
+	  push(@list_selects,$list_select);
+	}
+      } else {			# scalar keys are stored in base table
+	# illegal to have repeated search terms for base
+	$self->throw("scalar search key $key repeated") if 'ARRAY' eq ref $value;
+	$db_type=$TYPES{$type};
 	if (defined $value) {
 	  $value=$dbh->quote($value,$db_type);
-	  $list_select.="$table.$key=$value";
+	  push(@base_where,"$name.$key=$value");
 	} else {
-	  $list_select.="$table.$key IS NULL";
+	  push(@base_where,"$name.$key IS NULL");
 	}
-	push(@list_selects,$list_select);
-      }
-    } else {			# scalar keys are stored in base table
-      # illegal to have repeated search terms for base
-      $self->throw("scalar search key $key repeated") if 'ARRAY' eq ref $value;
-      $db_type=$TYPES{$type};
-      if (defined $value) {
-	$value=$dbh->quote($value,$db_type);
-	push(@base_where,"$name.$key=$value");
-      } else {
-	push(@base_where,"$name.$key IS NULL");
       }
     }
+    if (@base_where || !@list_selects) { 
+      # we do base query via regular join. include join if query would otherwise be empty
+      push(@base_where,qq($name.oid=$object_table.oid));
+      push(@from,$name); 
+    } 
+    # NG 10-09-13: added 'IS NOT NULL' to handle deleted objects
+    # my @where=(@base_where,map {qq($object_table.oid IN ($_))} @list_selects);
+    # my @where=(qq($object_table.object IS NOT NULL),
+    push(@where,@base_where,map {qq($object_table.oid IN ($_))} @list_selects);
+  } else {			        # empty query
+    push(@where,"$object_table.oid>1"); # get all user objects but skip registry
   }
-  my @from=($object_table);	# always need_AutoDB
-  if (@base_where || !@list_selects) { 
-    # we do base query via regular join. include join if query would otherwise be empty
-    push(@base_where,qq($name.oid=$object_table.oid));
-    push(@from,$name); 
-  } 
-  my @where=(@base_where,map {qq($object_table.oid IN ($_))} @list_selects);
   my $from=join(',',@from);
   my $where=join(' AND ',@where);
   #   my (@where,$limit);
@@ -147,11 +162,13 @@ sub parse_query {
   #   my $from=join(',',$object_table,keys %tables);
   #   my $where=join(' AND ',@where);
   # overwrite query
-  $query = " FROM $from WHERE $where";
-  if($limit) {
-    $query .= ' LIMIT ';
-    $query .= $limit;
-  }
+  my $query = " FROM $from WHERE $where";
+  # NG 10-09-15: rewrote for style
+  # if ($limit) {
+  #   $query .= ' LIMIT ';
+  #   $query .= $limit;
+  # }
+  $query.=" LIMIT $limit" if defined $limit;
   $query;
 }
 sub create {

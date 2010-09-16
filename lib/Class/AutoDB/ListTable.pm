@@ -35,7 +35,7 @@ sub put {
   my $name=$self->name;
 
   # since there are muliple values per oid, have to delete the old, then insert the new
-  my @sql=("delete from $name where oid=$oid");
+  my @sql=("DELETE FROM $name WHERE oid=$oid");
 
   my($key)=keys %keys;		# ListTables have just one key
   my $type=$keys{$key};
@@ -54,11 +54,20 @@ sub put {
 	push(@vals,$row);
       }
       my $values='values'. join(',',@vals);
-      push(@sql,"insert $name $columns $values");
+      push(@sql,"INSERT $name $columns $values");
     }
   }
   wantarray? @sql: \@sql;
 }
+# NG 10-09-06: added 'del' method
+sub del {
+  my($self,$oid)=@_;
+  my $dbh=$self->dbh;
+  my $name=$self->name;
+  my $sql="DELETE FROM $name WHERE oid=$oid";
+  wantarray? ($sql): [$sql];
+}
+
 sub create {
   my($self)=@_;
   my $name=$self->name;

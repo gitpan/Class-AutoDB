@@ -55,7 +55,7 @@ $mike->friends([$joe,$bill]);
 $barb->friends([$joe,$mary]);
 
 ########################################
-# this section recreates objects stored by 02 (update) test
+# this section recreates objects stored by 10 (update) test
 ########################################
 # make some new hobbies
 my $cycling=new Thing(desc=>'cycling',id=>id_next());

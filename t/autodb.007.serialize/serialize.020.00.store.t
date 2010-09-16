@@ -1,5 +1,5 @@
 ########################################
-# create and store some objects
+# create and store some objects, then delete them by setting object=NULL
 ########################################
 use t::lib;
 use strict;
@@ -18,7 +18,6 @@ my $dbh=DBI->connect("dbi:mysql:database=test",undef,undef,
 		     {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,});
 is($DBI::errstr,undef,'connect');
 Class::AutoDB::Serialize->dbh($dbh);
-
 my($old_count)=$dbh->selectrow_array(qq(SELECT COUNT(oid) FROM _AutoDB;));
 
 # make some non persistent objects
@@ -35,16 +34,14 @@ $np1->p0($p0); $np1->p1($p1); $np1->np0($np0); $np1->np1($np1);
 $p0->p0($p0); $p0->p1($p1); $p0->np0($np0); $p0->np1($np1);
 $p1->p0($p0); $p1->p1($p1); $p1->np0($np0); $p1->np1($np1);
 
-# store the persistent ones
-eval{$p0->store;};
-is($@,'','p0 store');
-eval{$p1->store;};
-is($@,'','p1 store');
-
-# make sure they were really stored
+# store the persistent ones & make sure they were really stored
+my $ok=1;
+eval{$p0->store; $p1->store;};
+$ok&=report_fail($@ eq '','p0 & p1 store');
 my($new_count)=$dbh->selectrow_array(qq(SELECT COUNT(oid) FROM _AutoDB;));
 my $actual_diff=$new_count-$old_count;
-is($actual_diff,2,'store correct number of objects');
+$ok&=report_fail($actual_diff==2,'store correct number of objects');
+report_pass($ok,'store');
 
 # remember oids for next test
 my @oids=map {$_->oid} ($p0,$p1);
@@ -53,10 +50,14 @@ my @ids=map {$_->id} ($p0,$p1);
 @oid2id{@oids}=@ids;
 @id2oid{@ids}=@oids;
 
-# fetch them back. should get same objects since already in memory
-my $actual_p0=Class::AutoDB::Serialize->fetch($p0->oid);
-my $actual_p1=Class::AutoDB::Serialize->fetch($p1->oid);
-is($actual_p0,$p0,'fetch p0');
-is($actual_p1,$p1,'fetch p1');
+# delete objects from database by setting object=NULL
+my $oids=join(', ',@oids);
+$dbh->do(qq(UPDATE _AutoDB SET object=NULL WHERE oid IN ($oids)));
+$ok=report_fail(!$dbh->err,$dbh->errstr);
+
+# make sure it really happened
+my($count)=$dbh->selectrow_array
+  (qq(SELECT COUNT(oid) FROM _AutoDB WHERE oid IN ($oids) AND object IS NULL;));
+ok($count==2,'objects deleted from database by setting object=NULL');
 
 done_testing();

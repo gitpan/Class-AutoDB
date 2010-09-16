@@ -13,7 +13,10 @@ sub DUMPER_thaw {
   my $oid=$self->{_OID};
   #print "<<< Class::AutoDB::Oid::DUMPER_thaw $self ($oid)\n";  
   my $obj=$OID2OBJ->{$oid};
-  return $obj if $obj;
+  # NG 10-09-11: yet another place where testing object messes up on Oid or OidDeleted,
+  #              'cuz 'bool' overloaded...
+  # return $obj if $obj;
+  return $obj if ref $obj;
   $OID2OBJ->{$oid}=$self;	# save for next time -- to preserve shared object structure
   $OBJ2OID->{refaddr $self}=$oid;
   $self;
@@ -30,12 +33,35 @@ sub oid {$_[0]->{_OID};}
 # If object not in memory, put is unncessary anyway
 # NG 09-12-19: Object->put now deprecated. I say this to clarify comment above
 sub put {
-  my $self=shift;
-  my $oid=$self->oid;
-  my $obj=$OID2OBJ->{$self->oid};
-  return if !$obj || UNIVERSAL::isa($obj,'Class::AutoDB::Oid');
-  return $obj->put(@_);
+  # NG 10-08-27: entire subroutine is exercise in futile paranoia.
+  #              can only get here if object is Oid in which case 'put' is nop
+  # my $self=shift;
+  # my $oid=$self->oid;
+  # my $obj=$OID2OBJ->{$self->oid};
+  # return if !$obj || UNIVERSAL::isa($obj,'Class::AutoDB::Oid');
+  # return $obj->put(@_);
 }
+
+# NG 10-09-09: decided to remove is_extant, is_deleted, del to avoid polluting namespace further
+# # NG 10-08-27: part of support for deleted objects
+# #              have to fetch object since that's the only way to know whether it's deleted.
+# #              probably not too big a performance hit, since application is likely to
+# #              access object pretty soon anyway...
+# sub is_extant {
+#   my $self=shift;
+#   my $oid=$self->oid;
+#   Class::AutoDB::Serialize::fetch($oid); # changes $self to real object or OidDeleted
+#   ref $self ne 'Class::AutoDB::OidDeleted';
+# }
+# sub is_deleted {!shift->is_extant}
+
+# # perfectly fine to call del on Oid. 
+# # pass though to AutoDB if it exists. else, Serialize::del is the best we can do
+# sub del {
+#   my $self=shift;
+#   my $autodb=$GLOBALS->autodb;
+#   $autodb? $autodb->del($self): Class::AutoDB::Serialize->del($self->oid);
+# }
 
 use vars qw($AUTOLOAD);
 sub AUTOLOAD {
@@ -90,15 +116,17 @@ sub stringify {
     eval "require $class" or die $@;
   }
   my $obj=Class::AutoDB::Serialize::fetch($oid);
-  $obj;
+  "$obj";
 }
 # Code below adapted from Graph v0.67
-sub eq {"$_[0]" eq "$_[1]"}
-sub ne {"$_[0]" ne "$_[1]"}
+# NG 10-09-11: removed eq, ne. Perl autogenerates from stringify
+# NG 10-09-11: changed bool to force fetch
+# sub eq {"$_[0]" eq "$_[1]"}
+# sub ne {"$_[0]" ne "$_[1]"}
 use overload
   '""' => \&stringify,
-  'bool'=>sub {defined $_[0]},
-  'eq' => \&eq,
-  'ne' => \&ne,
+  'bool'=>sub {length(stringify($_[0]))>0},
+  # 'eq' => \&eq,
+  # 'ne' => \&ne,
   fallback => 'TRUE';
 ####################

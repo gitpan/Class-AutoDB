@@ -5,17 +5,20 @@ use t::lib;
 use strict;
 use Carp;
 use Test::More;
-use Test::Deep;
 use autodbUtil;
 
 use Class::AutoDB::Serialize;
 use Persistent; use NonPersistent;
 
-tie_oid;
+my $errstr=create_autodb_table;
+is($errstr,undef,'create _AutoDB table');
+tie_oid('create');
+
 my $dbh=DBI->connect("dbi:mysql:database=test",undef,undef,
 		     {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,});
 is($DBI::errstr,undef,'connect');
 Class::AutoDB::Serialize->dbh($dbh);
+my($old_count)=$dbh->selectrow_array(qq(SELECT COUNT(oid) FROM _AutoDB;));
 
 # make some non persistent objects
 my $np0=new NonPersistent(name=>'np0',id=>id_next());
@@ -31,24 +34,28 @@ $np1->p0($p0); $np1->p1($p1); $np1->np0($np0); $np1->np1($np1);
 $p0->p0($p0); $p0->p1($p1); $p0->np0($np0); $p0->np1($np1);
 $p1->p0($p0); $p1->p1($p1); $p1->np0($np0); $p1->np1($np1);
 
-# fetch persistent ones
-my $p0_oid=$id2oid{$p0->id};
-my $p1_oid=$id2oid{$p1->id};
-my $actual_p0=eval{Class::AutoDB::Serialize->fetch($p0_oid);};
-is($@,'','p0 fetch');
-my $actual_p1=eval{Class::AutoDB::Serialize->fetch($p1_oid);};
-is($@,'','p1 fetch');
+# store the persistent ones
+eval{$p0->store;};
+is($@,'','p0 store');
+eval{$p1->store;};
+is($@,'','p1 store');
 
-cmp_deeply($actual_p0,$p0,'p0 contents');
-cmp_deeply($actual_p1,$p1,'p1 contents');
+# make sure they were really stored
+my($new_count)=$dbh->selectrow_array(qq(SELECT COUNT(oid) FROM _AutoDB;));
+my $actual_diff=$new_count-$old_count;
+is($actual_diff,2,'store correct number of objects');
 
-my @actual_reach=reach($actual_p0,$actual_p1);
-my @actual_ps=grep {'Persistent' eq ref $_} @actual_reach;
-my @actual_nps=grep {'NonPersistent' eq ref $_} @actual_reach;
-my %actual_id2p=group {$_->id} @actual_ps;
-my %actual_id2np=group {$_->id} @actual_nps;
+# remember oids for next test
+my @oids=map {$_->oid} ($p0,$p1);
+my @ids=map {$_->id} ($p0,$p1);
+@oid{@oids}=@oids;
+@oid2id{@oids}=@ids;
+@id2oid{@ids}=@oids;
 
-is((grep {@$_==1} values %actual_id2p),2,'persistent objects: 1 copy each');
-is((grep {@$_==2} values %actual_id2np),2,'non-persistent objects: 2 copies each');
+# fetch them back. should get same objects since already in memory
+my $actual_p0=Class::AutoDB::Serialize->fetch($p0->oid);
+my $actual_p1=Class::AutoDB::Serialize->fetch($p1->oid);
+is($actual_p0,$p0,'p0 fetch');
+is($actual_p1,$p1,'p1 fetch');
 
 done_testing();

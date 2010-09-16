@@ -36,9 +36,10 @@ my $count_get=`$secure_perl_path -Mblib $testfile count` || 17;
 my @files=
   ('putget.010.00.put.t put',
    # do all 3 query types for first case
-   'putget.010.01.get.t 0 get',
-   'putget.010.01.get.t 0 find',
-   'putget.010.01.get.t 0 find-getnext');
+   map {"putget.010.01.get.t 0 $_"} @get_types);
+#    'putget.010.01.get.t 0 get',
+#    'putget.010.01.get.t 0 find',
+#    'putget.010.01.get.t 0 find-getnext');
 # cycle once through the put & get types
 my $count=max(scalar @put_types,scalar @get_types);
 my $i;
@@ -54,6 +55,9 @@ for (; $i<$count_get; $i++) {
   my $get_type=$get_types[$i % scalar @get_types];
   push(@files,"putget.010.01.get.t $first_case $get_type");
 }
+# 02 & 03 scripts test queries with no args and SQL args. do all get_types
+push(@files,map {"putget.010.02.no_args.t $_"} @get_types);
+push(@files,map {"putget.010.03.sql.t $_"} @get_types);
 push(@testfiles,\@files);
 
 ########################################

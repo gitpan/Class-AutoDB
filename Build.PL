@@ -50,7 +50,7 @@ my $builder = $class->new
 			'Test::More' => 0.88,
 		       },
    requires =>         {'Carp' => 0,
-			'Class::AutoClass' => 1.53,
+			'Class::AutoClass' => 1.54,
 			'Class::Singleton' => 1.04,
 			'DBD::mysql' => 4.007,
 			'DBI' => 1.604,

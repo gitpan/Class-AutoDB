@@ -80,6 +80,14 @@ sub put {
   my @sql=map {$_->put($oid,\%key_values)} $self->tables;
   wantarray? @sql: \@sql;
 }
+# NG 10-09-06: added 'del' method
+sub del {
+  my($self,$object)=@_;
+  # generate SQL to delete object from each table
+  my $oid=Class::AutoDB::Serialize::obj2oid($object);
+  my @sql=map {$_->del($oid)} $self->tables;
+  wantarray? @sql: \@sql;
+}
 sub create {
   my($self,$index_flag)=@_;
   my @sql=map {$_->drop} $self->tables;	# drop tables if they exist

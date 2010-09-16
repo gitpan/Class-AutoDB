@@ -29,6 +29,8 @@ sub get {
   for my $row (@$rows) {
     my($oid,$freeze)=@$row;
     my $object=Class::AutoDB::Serialize::thaw($oid,$freeze);
+    # NG 10-09-13: skip deleted objects
+    next if 'Class::AutoDB::OidDeleted' eq ref $object;
     push(@objects,$object);
   }
   wantarray? @objects: \@objects;
@@ -40,15 +42,20 @@ sub get_next {
   $self->reset unless $self->is_started;
   my($dbh,$sth)=($self->dbh,$self->select_sth);
   return undef unless $sth && $sth->{Active};
-  my $object;
-  my($oid,$freeze)=$sth->fetchrow_array;
-  if (!$freeze) {		# either end of results or error
-    $self->throw("Database error in fetch for query\n".$self->select_sql."\n".$dbh->errstr) 
-      if $dbh->err;
-  } else {
-    $object=Class::AutoDB::Serialize::thaw($oid,$freeze);
+  # NG 10-09-13: added outer loop to skip deleted objects
+  while(1) {
+    my($oid,$freeze)=$sth->fetchrow_array;
+    # NG 10-09-13: changed test to support deleted objects ($freeze undef)
+    # if (!$freeze) {		# either end of results or error
+    if (!defined $oid) {		# either end of results or error
+      return undef unless $dbh->err;	# end of results
+      $self->throw("Database error in fetch for query\n".$self->select_sql."\n".$dbh->errstr);
+    } else {
+      my $object=Class::AutoDB::Serialize::thaw($oid,$freeze);
+      # NG 10-09-13: skip deleted objects
+      return $object unless 'Class::AutoDB::OidDeleted' eq ref $object;
+    }
   }
-  $object;
 }
 sub count {
   my($self)=@_;

@@ -111,7 +111,10 @@ sub alter_class_colls {
 sub drop_all {
   my $label=@_? shift: 'drop all';
   my $tables=dbh->selectcol_arrayref(qq(SHOW TABLES)); #  return ARRAY ref of table names
-  my @sql=map {qq(DROP TABLE IF EXISTS $_)} @$tables;
+  # NG 10-09-15: added DROP VIEW. changed SQL syntax to do all tables in one go
+  # my @sql=map {qq(DROP TABLE IF EXISTS $_)} @$tables;
+  $tables=join(',',@$tables);
+  my @sql=(qq(DROP TABLE IF EXISTS $tables),qq(DROP VIEW IF EXISTS $tables));
   do_sql(@sql);
   # make sure it worked
   my($package,$file,$line)=caller; # for fails

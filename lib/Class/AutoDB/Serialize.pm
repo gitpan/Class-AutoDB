@@ -67,7 +67,19 @@ sub dbh {
   my $self=shift;
   $GLOBALS->dbh(@_);
 }
-sub store {
+# NG 10-09-16: decided some time ago to remove is_extant, is_deleted to avoid polluting 
+#              namespace further, but forgot to comment them out from here
+# sub is_extant {	   # allow call as object or class method, or function
+#   shift if $_[0] eq __PACKAGE__ || UNIVERSAL::isa($_[0],__PACKAGE__);
+#   my $obj=shift;
+#   my $oid=$obj->oid;
+#   Class::AutoDB::Serialize::fetch($oid); # changes $self to real object or OidDeleted
+#   ref $obj ne 'Class::AutoDB::OidDeleted';
+# }
+# sub is_deleted {!is_extant(@_)}
+
+sub store {	   # allow call as object or class method, or function
+  shift if $_[0] eq __PACKAGE__;
   my($self,$transients)=@_;
   $DUMPER->Reset;
   # Make a shallow copy, replacing independent objects with stored reps
@@ -96,30 +108,56 @@ sub fetch {			# allow call as object or class method, or function
   # three cases: (1) new oid, (2) Oid exists, (3) real object exists
   my $obj=$OID2OBJ->{$oid};
   if (!defined $obj) {		                                # case 1
-    $obj=really_fetch($oid) || return undef;
+    # NG 10-08-24: really_fetch never returns undef
+    # $obj=really_fetch($oid) || return undef;
+    $obj=really_fetch($oid);
     $OID2OBJ->{$oid}=$obj;
     $OBJ2OID->{refaddr $obj}=$oid;
 #   weaken($OID2OBJ->{$oid});
   } elsif (UNIVERSAL::isa($obj,'Class::AutoDB::Oid')) { # case 2
-    $obj=really_fetch($oid,$obj) || return undef;
-  }		                        # case 3 -- nothing more to do
+    # NG 10-08-24: really_fetch never returns undef
+    # $obj=really_fetch($oid,$obj) || return undef;
+    $obj=really_fetch($oid,$obj);
+# }		                        # case 3 -- nothing more to do
+# NG 10-08-26: case now calls really_fetch to handle deleted objects. shouldn't hurt performance
+#              too much, if at all, since I don't think this case arises in practice...  
+  } else {
+    $obj=really_fetch($oid,$obj);
+  }
   $obj;
 }
 # used by 'get' methods in Cursor
 sub thaw {			# allow call as object or class method, or function
   shift if $_[0] eq __PACKAGE__ || UNIVERSAL::isa($_[0],__PACKAGE__);
   my($oid,$freeze)=@_;
-  # three cases: (1) new oid, (2) Oid exists, (3) real object exists
+  # three cases: (1) new oid, (2) Oid exists, (3) OidDeleted exists, (4) real object exists
   my $obj=$OID2OBJ->{$oid};
-  if (!$obj) {		                                # case 1
-    $obj=really_thaw($oid,$obj,$freeze) || return undef;
+  # NG 10-09-13: yet another place where testing object messes up on Oid or OidDeleted
+  #              'cuz 'bool' overloaded...
+  my $ref=ref $obj;
+  if (!$ref) {		                                # case 1
+    # NG 10-08-24: really_thaw never returns undef
+    # $obj=really_thaw($oid,$obj,$freeze) || return undef;
+    $obj=really_thaw($oid,$obj,$freeze);
     $OID2OBJ->{$oid}=$obj;
     $OBJ2OID->{refaddr $obj}=$oid;
 #   weaken($OID2OBJ->{$oid});
-  } elsif (UNIVERSAL::isa($obj,'Class::AutoDB::Oid')) { # case 2
-    $obj=really_thaw($oid,$obj,$freeze) || return undef;
-  }				                        # case 3 -- nothing more to do
+  } elsif ('Class::AutoDB::Oid' eq $ref) { # case 2
+    # NG 10-08-24: really_thaw never returns undef
+    # $obj=really_thaw($oid,$obj,$freeze) || return undef;
+    $obj=really_thaw($oid,$obj,$freeze);
+  }			                   # else case 3 or 4 -- nothing more to do
   $obj;
+}
+# returns number of objects deleted (0 or 1)
+sub del {			# allow call as object or class method, or function
+  shift if $_[0] eq __PACKAGE__ || UNIVERSAL::isa($_[0],__PACKAGE__);
+  my($oid)=@_;
+  # two cases: 
+  #   1) OidDeleted exists - already deleted, so nothing to do
+  #   2) anything else. really_delete does all the work
+  my $obj=$OID2OBJ->{$oid};
+  UNIVERSAL::isa($obj,'Class::AutoDB::OidDeleted')? 0: really_del($oid,$obj);
 }
 
 sub really_store {
@@ -141,45 +179,39 @@ sub really_store {
 }
 sub really_fetch {
   my($oid,$obj)=@_;
-  my($sth,$ret);
   my $dbh=$GLOBALS->dbh;
-  $sth=$dbh->prepare(qq(select object from _AutoDB where oid=?));
+  my $sth=$dbh->prepare(qq(select object from _AutoDB where oid=?));
   $sth->bind_param(1,$oid);
-  $ret=$sth->execute or confess $sth->errstr;
-  # get id of new object
+  my $ret=$sth->execute or confess $sth->errstr;
   my($freeze)=$sth->fetchrow_array;
-  # NG 10-01-01: moved errstr check up from 'unless' below. since unless now commented out
+  # NG 10-08-24: changed logic to handle deleted objects
+  #              $freeze will be NULL for non-existent oid or deleted object
+  #              $ret will be 0E0 for non-existent oid, 1 otherwise
+  #                note that 0E0 is both 0 and true! (see DBI docs)
+  #              moved errstr check up since always want to check for errors
   confess $sth->errstr if $sth->err;
-  # unless ($freeze) {
-    # confess $sth->errstr if $sth->err;
-    # my $class=$obj->{_CLASS};
-    # NG 10-01-01: moved error check from really_fetch to really_thaw because there
-    #              aer other ways of getting here
+  if ($ret==0) {		# non-existent oid
+    my $class=$obj->{_CLASS};
     # NG 06-05-16: changed warn to confess. calling routine dies immediately anyway
     #              and confess output easier to catch in eval
-    # confess qq/Trying to deserialize an instance of class $class with oid \'$oid\'. Ensure that: 
-    # \t 1) The object was serialized correctly (you may have forgotten to call put() on it). 
-    # \t 2) You can connect to the data source in which it has been serialized.\n/;
-    # warn qq/Trying to deserialize an instance of class $class with oid \'$oid\'. Ensure that: 
-    # \t 1) The object was serialized correctly (you may have forgotten to call put() on it). 
-    # \t 2) You can connect to the data source in which it has been serialized.\n/;
-    # return undef;
-  # }
+    confess qq/Trying to deserialize an instance of class $class with oid \'$oid\'. Ensure that: 
+    \t 1) The object was serialized correctly (you may have forgotten to call put() on it). 
+    \t 2) You can connect to the data source in which it has been serialized.
+    \t 3) The object was serialized correctly\n/;
+  }
   really_thaw($oid,$obj,$freeze);
 }
 sub really_thaw {
   my($oid,$obj,$freeze)=@_;
-  # NG 10-01-01: moved error check from really_fetch to really_thaw because there
-  #              aer other ways of getting here
-  # NG 06-05-16: changed warn to confess. calling routine dies immediately anyway
-  #              and confess output easier to catch in eval
-   unless ($freeze) {
-     my $class=$obj->{_CLASS};
-     confess qq/Trying to deserialize an instance of class $class with oid \'$oid\'. Ensure that: 
-    \t 1) The object was serialized correctly (you may have forgotten to call put() on it). 
-    \t 2) You can connect to the data source in which it has been serialized.
-    \t 3) The object was serialized correctly\n/;
-   }
+  # NG 10-08-24: changed logic to handle deleted objects
+  #              $freeze will be NULL for deleted object. convert to OidDeleted object
+  #              moved the famous 'confess' up to really_fetch: although other ways to 
+  #                get here will get here with non-existent oid (I think!!)
+  unless ($freeze) {
+    defined $obj or $obj=oid2obj($oid) || {};
+    %$obj=(_OID=>$oid);	      # clear out existing object leaving just oid
+    return bless $obj,'Class::AutoDB::OidDeleted';
+  }
   my $thaw;			# variable used in $DUMPER
   eval $freeze;			# sets $thaw
   # if the thawed structure is circular and refers to the present object,
@@ -210,6 +242,25 @@ sub really_thaw {
     eval "require $class" or die $@;
   }
   bless $obj,$class;
+}
+sub really_del {
+  my($oid,$obj)=@_;
+  my $dbh=$GLOBALS->dbh;
+  # NG 10-09-12: use REPLACE so del before put will store NULL in _AutoDB
+  # my $ret=$dbh->do(qq(UPDATE _AutoDB SET object=NULL WHERE oid=$oid));
+  my $ret=$dbh->do(qq(REPLACE _AutoDB (oid,object) VALUES ($oid,NULL)));
+  confess $dbh->errstr if $dbh->err;
+  # NG 10-09-12: yet another place where testing object messes up on Oid or OidDeleted
+  #              'cuz 'bool' overloaded...
+  if (ref $obj) {
+    # clear out existing object, leaving just oid and class
+    # note that Oid already has what we want
+    %$obj=(_OID=>$oid,_CLASS=>ref $obj) unless UNIVERSAL::isa($obj,'Class::AutoDB::Oid');
+    bless $obj,'Class::AutoDB::OidDeleted';
+  }
+  # $ret is number of objects deleted. will be 0E0 for non-existent oid, 1 otherwise
+  #   note that 0E0 is both 0 and true! (see DBI docs)
+  $ret==0? 0: $ret;
 }
 
 sub DESTROY {

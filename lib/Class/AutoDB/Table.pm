@@ -52,8 +52,11 @@ sub schema {
 sub drop {
   my($self)=@_;
   my $name=$self->name;
-  my $sql="drop table if exists $name";
-  wantarray? ($sql): [$sql];
+  # NG 10-09-15: added DROP VIEW 
+  # my $sql="drop table if exists $name";
+  # wantarray? ($sql): [$sql];
+  my @sql=(qq(DROP TABLE IF EXISTS $name),qq(DROP View IF EXISTS $name));
+  wantarray? @sql: \@sql;
 }
 # NG 09-12-27: quick hack to let abbreviated types match in CollectionDiff
 # TODO: TYPE and type checking duplicated in many modules. fix this!

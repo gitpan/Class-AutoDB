@@ -9,7 +9,6 @@ use base qw(Class::AutoDB::Object);
 # use vars qw(%AUTODB);
 # %AUTODB=(collection=>'Serialize_OK',keys=>qq(id int, name string));
 
-
 use vars qw(@AUTO_ATTRIBUTES);
 @AUTO_ATTRIBUTES=qw(id name p0 p1 np0 np1);
 Class::AutoClass::declare;

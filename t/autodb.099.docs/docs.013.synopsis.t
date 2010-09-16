@@ -20,7 +20,7 @@ my $depts=$dbh->selectcol_arrayref
   (qq(SELECT Dept.name FROM Dept, EmpDept, Person 
       WHERE Dept.id=EmpDept.dept_id AND EmpDept.emp_id=Person.id 
       AND Person.name='Joe'));
-cmp_deeply($depts,bag(qw(toy pet)),"Joe's departments");
+cmp_deeply($depts,bag(qw(toy pet)),'connect auto-persistent objects with engineered tables');
 
 done_testing();
 

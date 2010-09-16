@@ -1,7 +1,7 @@
 # Updated version of Chris's dd_freeze_thaw.t
 # tests basic freeze/thaw behavior of Dumper to make sure our patch is installed
 # update to use Class::AutoDB::Dumper
-package DD_test;
+# package DD_test;
 use lib qw(../blib/lib ../blib/arch);
 use Class::AutoDB::Dumper;
 use Test::More;

@@ -15,6 +15,11 @@ sub __autodb {
   $GLOBALS->autodb(@_);
 }
 
+# NG 10-08-27: Serialize also defines oid method, which is how Object previously got it
+#              moved here as part of interface standardization and namespace cleanup tasks
+sub oid {Class::AutoDB::Serialize->obj2oid(@_)}
+
+# pass though to AutoDB if it exists. else, Serialize::store is the best we can do
 sub put {
   my($self,$autodb)=@_;
   $autodb or $autodb=$self->__autodb;
@@ -25,8 +30,24 @@ sub put {
   # $self->Class::AutoDB::Serialize::store($transients); # store the serialized form
   # my @sql=map {$_->put($self)} @$collections; # generate SQL to store object in collections
   # $autodb->do_sql(@sql);
-  $autodb->put($self);
+  $autodb? $autodb->put($self): Class::AutoDB::Serialize->store($self);
 }
+
+# NG 10-09-09: decided to remove is_extant, is_deleted, del to avoid polluting namespace further
+# # NG 10-08-27: part of support for deleted objects
+# #              is_extant always says 'yes'; technically not right since object may have
+# #              been deleted by another process behind our back. but this is only one
+# #              of many ways we get screwed by concurrency. a problem for another day :)
+# sub is_extant {1}
+# sub is_deleted {0}
+
+# # perfectly fine to call del on Oid. 
+# # pass though to AutoDB if it exists. else, Serialize::del is the best we can do
+# sub del {
+#   my $self=shift;
+#   my $autodb=$GLOBALS->autodb;
+#   $autodb? $autodb->del($self): Class::AutoDB::Serialize->del($self->oid);
+# }
 #sub transients {
 #  my($self,$autodb)=@_;
 #  $autodb or $autodb=$self->autodb;
@@ -38,6 +59,10 @@ sub put {
 #              when I added overloaded "" operation to Oid, it caused real objects
 #              to complain that "" was overloaded but no method found. the problem
 #              may be caused by objects that start life os Oids then are reblessed.
+# NG 10-09-09: as hypothesized above, there is a known bug in Perls < 5.9.4 that
+#              cause overloading to fail sometimes with references to reblessed objects.
+#              added '""' below as workaround.
 use overload
+  '""' => sub {$_[0]},
   fallback => 'TRUE';
 ####################

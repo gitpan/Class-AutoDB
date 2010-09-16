@@ -42,10 +42,17 @@ sub put {
   }
   my $columns='('.join(',',@columns).')';
   my $values='values('. join(',',@values).')';
-  my $sql="replace $name $columns $values";
+  my $sql="REPLACE $name $columns $values";
   wantarray? ($sql): [$sql];
 }
-
+# NG 10-09-06: added 'del' method
+sub del {
+  my($self,$oid)=@_;
+  my $dbh=$self->dbh;
+  my $name=$self->name;
+  my $sql="DELETE FROM $name WHERE oid=$oid";
+  wantarray? ($sql): [$sql];
+}
 sub create {
   my($self)=@_;
   my $name=$self->name;

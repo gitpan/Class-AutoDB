@@ -3,7 +3,7 @@ use t::lib;
 use strict;
 use Carp;
 # use Scalar::Util qw(looks_like_number reftype); # sigh. Test::Deep exports reftype, too
-use Scalar::Util qw(looks_like_number);
+use Scalar::Util qw(looks_like_number refaddr);
 use List::MoreUtils qw(uniq);
 use DBI;
 use Test::More;
@@ -34,6 +34,7 @@ use vars qw(@AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS %DEFAULTS);
 #   correct_diffs=number or {table=>diff}
 #     if number, diff for each correct_tables
 #     for 'multi' tests, diff is per object
+#   default_diffs={table=>diff}  -- any table not mentioned has default of 1
 #   labelprefix                  -- string prepended to every label
 #   label                        -- sub to compute object-specific portion of label
 #   new_args=>sub to construct objects. called w/ TestObject as arg
@@ -47,19 +48,25 @@ use vars qw(@AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS %DEFAULTS);
 #   get_args                     -- args to $autodb->get and find
 #     can be a CODE ref or actual args
 #   get_type                     -- 'get', 'find', 'find-getnext'. default 'get'
+#   del_type                     -- 'del', 'del-multi'. default 'del'
 #   object or objects            -- objects to test
 #   correct_object or _objects   -- correct objects for retrieval test
 #   actual_object or _objects    -- actual objects for retrieval test - synonym for objects
-@AUTO_ATTRIBUTES=qw(class2colls class2transients coll2basekeys coll2listkeys old_objects 
+#   del_objects                  -- deleted objects. 
+#                                   can be set by hand. updated by test_del
+@AUTO_ATTRIBUTES=qw(class2colls class2transients coll2basekeys coll2listkeys default_diffs
+		    old_objects del_objects
 		    labelprefix 
-		    new_args put_type get_args get_type current_object);
+		    new_args put_type get_args get_type del_type current_object);
 @OTHER_ATTRIBUTES=qw(class label class2tables tables coll2keys coll2tables
 		     correct_colls correct_tables correct_diffs 
 		     object objects correct_object correct_objects);
 %SYNONYMS=(last_object=>'current_object',actual_object=>'object',actual_objects=>'objects');
 %DEFAULTS=
   (class2colls=>{},class2transients=>{},coll2keys=>{},coll2basekeys=>{},coll2listkeys=>{},
-   put_type=>'put',get_type=>'get',
+   default_diffs=>{},
+   del_objects=>[],
+   put_type=>'put',get_type=>'get',del_type=>'del'
    );
 # new_args=>sub{my($test)=@_}
 sub _init_self {
@@ -99,7 +106,7 @@ sub test_put {
 sub _test_put_one {
   my($self,$file,$line)=@_;
   my @objects=@{$self->objects};
-  my %old_objects=map {$_=>$_} @{$self->old_objects||[]};
+  my %old_objects=map {refaddr($_)=>1} @{$self->old_objects||[]};
   my $put_type=$self->put_type;
   for my $object (@objects) {
     $self->current_object($object); # all class- and object-specific attrs use this
@@ -109,12 +116,12 @@ sub _test_put_one {
     my @tables=@{$self->tables};
     my @correct_tables=@{$self->correct_tables};
     # my $correct_diffs=$self->correct_diffs;
-    my $correct_diffs=$old_objects{$object}? {}: $self->correct_diffs;
+    my $correct_diffs=$old_objects{refaddr $object}? {}: $self->correct_diffs;
 
     my $ok=1;
     my $label=$self->label."oid before put";
-    $ok&&=($old_objects{$object}? 
-	   _ok_oldoid($object,$label,$file,$line,@correct_tables):
+    $ok&&=($old_objects{refaddr $object}? 
+	   _ok_oldoid($object,$label,$file,$line):
 	   _ok_newoid($object,$label,$file,$line,@tables));
     # $ok&&=_ok_newoid($object,$label,$file,$line,@tables);
     # report_pass($ok,$label);
@@ -126,10 +133,10 @@ sub _test_put_one {
     # }
     autodb->put($object);
     remember_oids($object);
-    # remember_oids($object) unless $old_objects{$object};
+    # remember_oids($object) unless $old_objects{refaddr $object};
     next unless $ok;		# skip remaining tests once we have a fail
     my $label=$self->label."oid after put";
-    $ok&&=_ok_oldoid($object,$label,$file,$line,@correct_tables);
+    $ok&&=_ok_oldoid($object,$label,$file,$line);
     # report_pass($ok,$label);
     for my $coll (@correct_colls) {
       my $label=$self->label."collection $coll";
@@ -144,7 +151,7 @@ sub _test_put_one {
     report_pass($ok,$self->label."done");
     # cmp_deeply($actual_diffs,$correct_diffs,$self->label."table counts");
     # report_pass($ok,$label);
-    $old_objects{$object}=$object;
+    $old_objects{refaddr $object}=1;
   }
   $self->objects(undef);     # clear so won't retest these objects next time
   $self->old_objects(undef); # clear for next time
@@ -154,7 +161,7 @@ sub _test_put_one {
 sub _test_put_multi {
   my($self,$file,$line)=@_;
   my @objects=@{$self->objects};
-  my %old_objects=map {$_=>$_} @{$self->old_objects||[]};
+  my %old_objects=map {refaddr($_)=>1} @{$self->old_objects||[]};
   my $put_type=$self->put_type;
   # do all the before-put tests
   for my $object (@objects) {
@@ -165,12 +172,12 @@ sub _test_put_multi {
     my @tables=@{$self->tables};
     my @correct_tables=@{$self->correct_tables};
     # my $correct_diffs=$self->correct_diffs;
-    my $correct_diffs=$old_objects{$object}? {}: $self->correct_diffs;
+    my $correct_diffs=$old_objects{refaddr $object}? {}: $self->correct_diffs;
 
     my $ok=1;
     my $label=$self->label."oid before put";
-    $ok&&=($old_objects{$object}? 
-	   _ok_oldoid($object,$label,$file,$line,@correct_tables):
+    $ok&&=($old_objects{refaddr $object}? 
+	   _ok_oldoid($object,$label,$file,$line):
 	   _ok_newoid($object,$label,$file,$line,@tables));
   }
   # now put 'em
@@ -194,12 +201,12 @@ sub _test_put_multi {
     my @correct_colls=@{$self->correct_colls};
     my @tables=@{$self->tables};
     my @correct_tables=@{$self->correct_tables};
-    my $correct_diffs=$old_objects{$object}? {}: $self->correct_diffs;
+    my $correct_diffs=$old_objects{refaddr $object}? {}: $self->correct_diffs;
 
-    # remember_oids($object) unless $old_objects{$object};
+    # remember_oids($object) unless $old_objects{refaddr $object};
     my $ok=1;
     my $label=$self->label."oid after put";
-    $ok&&=_ok_oldoid($object,$label,$file,$line,@correct_tables);
+    $ok&&=_ok_oldoid($object,$label,$file,$line);
     # report_pass($ok,$label);
     for my $coll (@correct_colls) {
       my $label=$self->label."collection $coll";
@@ -264,7 +271,7 @@ sub test_get {
 
     # my $ok=1;
     my $label=$self->label."(via reach) oid";
-    $ok&&=_ok_oldoid($object,$label,$file,$line,@correct_tables);
+    $ok&&=_ok_oldoid($object,$label,$file,$line);
     # report_pass($ok,$label);
     for my $coll (@correct_colls) {
       my $label=$self->label."(via reach) collection $coll";
@@ -317,6 +324,71 @@ sub test_get {
   $self->correct_objects(undef);                # clear so won't retest these objects next time
   scalar @correct_objects;
 }
+
+#####################################
+# NG 10-09-08: added del test
+# delete and test some objects.
+sub test_del {
+  my $self=shift;
+  my($package,$file,$line)=caller; # for fails
+  $self->_init_test(@_);
+  my @objects=@{$self->objects};
+  my %del_objects=map {refaddr($_)=>1} @{$self->del_objects||[]};
+  my $del_type=$self->del_type;
+  # do all the before-del tests
+  for my $object (@objects) {
+    $self->current_object($object); # all class- and object-specific attrs use this
+    my $class=$self->class;
+    my %coll2keys=%{$self->coll2keys};
+    my @correct_colls=@{$self->correct_colls};
+    my @tables=@{$self->tables};
+    my @correct_tables=@{$self->correct_tables};
+    my $correct_diffs=$del_objects{refaddr $object}? {}: $self->correct_diffs;
+
+    my $ok=1;
+    my $label=$self->label."oid before del";
+    $ok&&=($del_objects{refaddr $object}?
+	   _ok_deloid($object,$label,$file,$line,@correct_tables): 1);
+  }
+  if ($del_type=~/multi/) {
+    autodb->del(@objects);
+  } else {
+    map {autodb->del($_)} @objects;
+  }
+  # now do the per-object after-del tests (and accumulate final diffs)
+  my $final_diffs={};
+  for my $object (@objects) {
+    $self->current_object($object); # all class- and object-specific attrs use this
+    my $class=$self->class;
+    my %coll2keys=%{$self->coll2keys};
+    my @correct_colls=@{$self->correct_colls};
+    my @tables=@{$self->tables};
+    my @correct_tables=@{$self->correct_tables};
+    my $correct_diffs= $del_objects{refaddr $object}? {}: $self->correct_diffs;
+
+    my $ok=1;
+    my $label=$self->label."oid after del";
+    $ok&&=_ok_deloid($object,$label,$file,$line,@correct_tables);
+    # add correct_diffs to final diffs
+    while(my($table,$diff)=each %$correct_diffs) {
+      $final_diffs->{$table}-=$diff;
+    }
+  }
+  # test final diffs
+  $self->current_object(undef);
+  my $actual_diffs=$self->diff_counts;
+  my($ok,$details)=cmp_details($actual_diffs,$final_diffs);
+  # report($ok,$self->label."table counts",$file,$line,$details);
+  report_fail($ok,$self->label."table counts",$file,$line,$details);
+  report_pass($ok,$self->label);
+  # cmp_deeply($actual_diffs,$correct_diffs,$self->label."table counts");
+  # report_pass($ok,$label);
+
+  $self->objects(undef);     # clear so won't retest these objects next time
+  push(@{$self->del_objects},@objects); # update for next time
+  scalar @objects;
+}
+
 sub do_get {
   my $self=shift;
   my $get_args=@_? shift: $self->get_args;
@@ -407,7 +479,9 @@ sub label {
 sub class {
   my $self=shift;
   $self->{class}=$_[0] if @_;
-  ref $self->current_object || $self->{class};
+  my $ref=ref $self->current_object;
+  $ref=$self->current_object->{_CLASS} if UNIVERSAL::isa($ref,'Class::AutoDB::Oid');
+  $ref || $self->{class};
 }
 
 sub correct_colls {
@@ -533,7 +607,10 @@ sub correct_diffs {
     my $diff=defined $correct_diffs? $correct_diffs: 1;	# hang onto old value
     $correct_diffs={};
     my @correct_tables=@{$self->correct_tables};
-    @$correct_diffs{@correct_tables}=($diff)x@correct_tables;
+    my $default_diffs=$self->default_diffs;
+    # NG 10-09-09: use defaults for any tables mentioned in default_diffs
+    @$correct_diffs{@correct_tables}=
+      map {defined $default_diffs->{$_}? $default_diffs->{$_}: $diff} @correct_tables;
     # $self->correct_diffs($correct_diffs);
   } else { 			# minimal default
     $correct_diffs={_AutoDB=>1};
@@ -578,7 +655,7 @@ sub correct_objects {
 sub old_counts {
   my $self=shift;
   my @tables=@_? @_: @{$self->tables};
-  my $old_counts=$self->{old_counts} or ($self->_old_counts(@tables));
+  my $old_counts=$self->{old_counts} || ($self->_old_counts(@tables));
   # $old_counts=norm_counts(map {$_=>$old_counts->{$_}} @tables);
   $old_counts;
 }

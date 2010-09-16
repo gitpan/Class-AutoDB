@@ -10,7 +10,7 @@ use Class::AutoDB::Connect;
 use Class::AutoDB::Database;
 use Class::AutoDB::Registry;
 use Class::AutoDB::RegistryDiff;
-our $VERSION = '1.11';
+our $VERSION = '1.19_01';
 $VERSION=eval $VERSION;		# I think this is the accepted idiom..
 
 # NG 09-11-24: move Database first so AutoClass::get will not mask Database::get
@@ -74,6 +74,18 @@ sub register {
   $self->manage_registry
     (new Hash::AutoHash::Args alter=>$self->alter_param,index=>$self->index_param);
 }
+# NG 10-09-16: realized some time ago that is_extant, is_deleted redundant since overloaded
+#              'bool' does same thing more easily, but forgot to comment them out from here
+# NG 10-09-07: added is_extant, is_deleted to support deleted objects
+# sub is_extant {
+#   my($self,$obj)=@_;
+#   Class::AutoDB::Serialize::is_extant($obj);
+# }
+# sub is_deleted {
+#   my($self,$obj)=@_;
+#   !Class::AutoDB::Serialize::is_extant($obj);
+# }
+
 # NG 09-11-24: extend put_object to put list of objects
 # NG 09-12-19: rewrote to avoid $obj->put for cleanup of user-object namespace
 sub put_objects {
@@ -111,6 +123,7 @@ sub put {
     # next if $obj==$registry;	# registry takes care of itself
     # NG 09-12-19: this line now needed because we stopped doing $obj->put
     #              (Oid has 'put' method that skips the store)
+    # NG 10-09-06: note that OidDeleted isa Oid
     next if UNIVERSAL::isa($obj,'Class::AutoDB::Oid');
     # NOTE: overload man page suggests comparing refaddrs instead of object.
     #       but comparing objects seems to work, provided $obj NOT Oid!!
@@ -123,6 +136,21 @@ sub put {
     $self->throw("trying to put something non-persistent: $obj") unless $oid;
     Class::AutoDB::Serialize::store($obj,$transients); # store the serialized form
     my @sql=map {$_->put($obj)} @$collections;         # generate SQL to store in collections
+    $self->do_sql(@sql);
+  }
+}
+# NG 10-09-06: added 'del' method
+sub del {
+  my $self=shift;
+  my $registry=$self->registry;
+  for my $obj (@_) {
+    next if UNIVERSAL::isa($obj,'Class::AutoDB::OidDeleted'); # already deleted
+    my $class=UNIVERSAL::isa($obj,'Class::AutoDB::Oid')? $obj->{_CLASS}: ref $obj;
+    my $oid=Class::AutoDB::Serialize::obj2oid($obj);
+    my $collections=$registry->class2collections($class);
+    $self->throw("trying to delete something non-persistent: $obj") unless $oid;
+    Class::AutoDB::Serialize::del($oid);      # delete from _AutoDB table
+    my @sql=map {$_->del($obj)} @$collections;         # generate SQL to store in collections
     $self->do_sql(@sql);
   }
 }
@@ -205,7 +233,7 @@ Class::AutoDB - Almost automatic object persistence coexisting with human-engine
 
 =head1 VERSION
 
-Version 1.11
+Version 1.19_01
 
 =head1 SYNOPSIS
 
@@ -221,7 +249,9 @@ Version 1.11
   Class::AutoClass::declare;
 
   ########################################
-  # code that uses persistent class - create and store new objects
+  # code that uses persistent class
+
+  # create and store new objects
   #
   use Class::AutoDB;
   use Person;
@@ -240,8 +270,7 @@ Version 1.11
   # store objects in database
   $autodb->put_objects;
 
-  ########################################
-  # code that uses persistent class - retrieve existing objects
+  # retrieve existing objects
   #
   use Class::AutoDB;
   use Person;
@@ -275,6 +304,26 @@ Version 1.11
     (qq(SELECT Dept.name FROM Dept, EmpDept, Person 
         WHERE Dept.id=EmpDept.dept_id AND EmpDept.emp_id=Person.id 
         AND Person.name='Joe'));
+
+  ########################################
+  # new features in verion 1.20
+
+  # retrieve objects using SQL
+  # assuming the above database (with human-engineered tables Dept and EmpDept),
+  # this query retrieves Person objects for employees in the toy department
+  my @toy_persons=
+  $autodb->get
+    (sql=>qq(SELECT oid FROM Dept, EmpDept, Person 
+             WHERE Dept.id=EmpDept.dept_id AND EmpDept.emp_id=Person.id 
+             AND Dept.name='toy'));
+
+  # retrieve all objects
+  my @all_objects=$autodb->get;
+
+  # delete objects
+  #
+  $autodb->del(@males);                                  # delete the boys  
+
 
 =head1 DESCRIPTION
 
@@ -377,6 +426,13 @@ represent the 'name' attribute of Person objects.  If you expect each
 Person to have a separate Name object (which seems likely), it will
 work fine for Name to be non-persistent.  However, if you want Persons
 to share Names, you should declare Name to be persistent.
+
+As of version 1.20, it is possible to delete persistent objects using
+the 'del' method. Deleting an object removes it from memory and the
+database. However, it does not remove references to the deleted
+objects that may be held in program variable or other objects.  In
+boolean context, a deleted object evaluates to undef; in a string
+context it evaluates to an empty string. 
 
 =head2 Defining a persistent class
 
@@ -750,8 +806,8 @@ object.
 When an object is retrieved from the database, the system does NOT
 immediately process the oids it contains. Instead, the system waits
 until the program tries to access the referenced object at which point
-it automatically retrieves the object from the database. Options are
-provided to retrieve oids earlier.
+it automatically retrieves the object from the database. In a future
+release, options may be provided to retrieve oids earlier.
 
 If a program retrieves the same oid multiple times, the system short
 circuits the database access and ensures that only one copy of the
@@ -763,6 +819,13 @@ maintain an in-memory hash of all fetched objects (keyed by oid). The
 software consults this hash when asked to retrieve an object; if the
 object is already in memory, it is returned without even going to the
 database.
+
+Deleting an object converts its in-memory representation to a special
+kind of deleted-oid, removes the object from all its collections, and
+changes its BLOB in the object column of the _AutoDB table to NULL. We
+leave the object's oid in the _AutoDB table to allow better error
+handling on subsequent attempts to access the object.  See L<"Object
+deletion details"> for further discussion.
 
 =head3 Data::Dumper details
 
@@ -782,6 +845,8 @@ copy of the object.
 classes do and emits a call to the method even if the object in
 question can't do it.
 
+=back
+
 We modified Data::Dumper to fix these problems. To avoid any confusion
 with the official version of the code, we renamed the modified version
 Class::AutoDB::Dumper and include it in our code tree.
@@ -796,7 +861,73 @@ ignored. The Data::Dumper docs claim that the code will fall back to
 the pure Perl implementation if the C version is not available.  We
 haven't checked this claim.
 
-=back
+=head3 Object deletion details
+
+Object deletion is a bit messy, since it is not a Perl concept.  In
+standard Perl, an object exists until all references to the object
+cease to exist.  As a result, the programmer never has to worry about
+stale references.  The situation changes when we introduce object
+deletion: it is now possible for a variable to contain a reference
+pointing to an object that has been deleted; likewise, an object can
+contain a reference (technically an Oid) pointing to a deleted object.
+
+The closest Perl analog is L<weak
+references|Scalar::Util/"weaken_REF">.  The standard Perl rule stated
+above -- "an object exists until all references to the object cease to
+exist" -- does not apply to weak references.  A weak reference can go
+stale (in other words, point to an object that no longer exists). When
+this happens, Perl sets the reference to undef, and any attempt to
+access the object via the stale reference generates an error.
+
+We adopt similar semantics for object deletion.  We do not convert
+stale references to undef (would require delving into Perl internals
+-- doable but not worth the effort), but we detect attempts to invoke
+methods on deleted objects and 'confess' with appropriate error
+messages.  This complicates the application, but there seems to be no
+better choice.
+
+An application that uses object deletion extensively has to guard
+against attempts to invoke methods on deleted objects.  One way to
+do this is to test the object before accessing it.  For example, if
+$object contains a reference to an object that might be deleted,
+you might use this code snippet:
+
+ if ($object) {   # $object will test 'true' if it still exists
+   # okay to invoke methods on $object here
+ } else {           # 'else' $object has been deleted
+   # deal with deleted object here
+ }
+
+To avoid such complications, we recommend using object deletion only
+in situations where you can confidently remove all references to the
+deleted objects.  For example, we use it when re-initializing entire
+data structures.
+
+The 'del' method operates on the in-memory and database
+representations of the objects being deleted. 
+
+It converts the in-memory representation to an OidDeleted, which is a
+special kind of Oid.  Any attempt to invoke application methods on an
+OidDeleted confesses.
+
+On the database, 'del' updates the object table (_AutoDB) and all
+tables implementing collections that contain the object.  In _AutoDB,
+'del' sets the 'object' column to NULL thereby removing the object's
+BLOB representation from the database; it leaves the object's oid in
+_AutoDB so we can detect future attempts to access the deleted object
+and generate an appropriate error message.  (If we were to delete the
+oid, it would look like the object was never stored, and future
+accesses would generate a misleading error message).  In collection
+tables, 'del' removes all rows representing the object; the code
+basically deletes the object from any table that 'put' would have put
+it in.
+
+'del' does B<not> remove references to the deleted object as this
+would require scanning the entire database.
+
+Queries ('get', 'find') will never retrieve a deleted object (although
+they may retrieve objects containing references to deleted object),
+and 'count' will not include deleted objects in its count.
 
 =head1 METHODS AND FUNCTIONS
 
@@ -1019,7 +1150,7 @@ automatically if the connection breaks.
 =head2 Queries
 
 The methods described here operate on Class::AutoDB objects.  See
-L<"METHODS AND FUNCTIONS - Cursors"> for related methods operating on
+L<METHODS AND FUNCTIONS - Cursors|"Cursors"> for related methods operating on
 Class::AutoDB::Cursor objects.
 
 =head3 get
@@ -1034,6 +1165,16 @@ Class::AutoDB::Cursor objects.
            -- OR --
            my $males=$autodb->get(collection=>'Person',
                                   query=>{name=>'Joe',sex=>'M'})
+           -- OR --
+           my @all_objects=$autodb->get
+           -- OR --
+           my $all_objects=$autodb->get
+           -- OR --
+           my @joe_bill=$autodb->get(sql=>qq(SELECT oid FROM Person 
+                                             WHERE name='Joe' OR name='Bill'))
+           -- OR --
+           my $joe_bill=$autodb->get(sql=>qq(SELECT oid FROM Person 
+                                             WHERE name='Joe' OR name='Bill'))
  Function: Execute query and return results
  Returns : list or ARRAY of objects satisfying query
  Args    : collection Name of collection being queried
@@ -1043,11 +1184,20 @@ Class::AutoDB::Cursor objects.
                       'list(object)', value must be simple scalar (string or 
                       integer). For 'object' or 'list(object)', value must be
                       persistent object
+           sql        raw SQL that selects oids of objects to be retrieved 
            other args interpreted as search_key=>value pairs
+ Notes   : With no arguments, retrieves all objects.
+           Okay to include both search keys and SQL
 
 search_key=>value pairs are ANDed. For list types, the query is true if
 any element on list has the value. If a collection has a search key named
 'collection', you must use an explicit 'query' arg to include it in a query.
+
+The SQL argument must select a single column which is interpreted as
+containing the oids of objects to be retrieved. Our code adds
+additional SQL that uses the oids to select objects from _AutoDB.
+
+If you supply search_key=>value pairs and a SQL statement, they are ANDed.
 
 =head3 find
 
@@ -1056,6 +1206,11 @@ any element on list has the value. If a collection has a search key named
            -- OR --
            my $cursor=$autodb->find(collection=>'Person',
                                     query=>{name=>'Joe',sex=>'M'})
+           -- OR --
+           my $cursor=$autodb->find
+           -- OR --
+           my $cursor=$autodb->find(sql=>qq(SELECT oid FROM Person 
+                                            WHERE name='Joe' OR name='Bill'))
  Function: Execute query. 
  Returns : Class::AutoDB::Cursor object which can be used to retrieve results
  Args    : same as 'get'
@@ -1068,6 +1223,11 @@ any element on list has the value. If a collection has a search key named
            -- OR --
            my $count=$autodb->count(collection=>'Person',
                                     query=>{name=>'Joe',sex=>'M'})
+           -- OR --
+           my $cursor=$autodb->find
+           -- OR --
+           my $cursor=$autodb->find(sql=>qq(SELECT oid FROM Person 
+                                            WHERE name='Joe' OR name='Bill'))
  Function: Count number of objects satisfying query
  Returns : number
  Args    : same as 'get'
@@ -1080,12 +1240,13 @@ any element on list has the value. If a collection has a search key named
  Function: Access object's oid (immutable object identifier)
  Returns : oid as number, NOT Class::AutoDB::Oid object. undef if argument not
            persistent
- Args    : persistent object or Class::AutoDB::Oid object
+ Args    : persistent object, Class::AutoDB::Oid object, or 
+           Class::AutoDB::OidDeleted object
 
 =head2 Cursors
 
 The methods described here operate on Class::AutoDB::Cursor objects
-returned by L<"find">.  See L<"METHODS AND FUNCTIONS - Queries"> for
+returned by L<"find">.  See L<METHODS AND FUNCTIONS - Queries|"Queries"> for
 related methods operating on Class::AutoDB objects.
 
 =head3 get
@@ -1136,7 +1297,8 @@ remaining objects
  Usage   : $autodb->put(@objects)
  Function: Store one or more objects in database
  Returns : nothing
- Args    : list of persistent objects or Oids
+ Args    : list of persistent objects, Oids, or OidDeleteds
+ Notes   : nop (does nothing) on Oids and OidDeleteds
 
 The difference between 'put' and 'put_objects' is that when called
 with no objects, 'put' does nothing, while 'put_objects' stores all
@@ -1151,11 +1313,21 @@ persistent objects
  Function: Store all persistent objects (first form) or list of persistent 
            objects (second form)
  Returns : nothing
- Args    : list of persistent objects or Oids
+ Args    : list of persistent objects, Oids, or OidDeleteds
+ Notes   : nop (does nothing) on Oids and OidDeleteds
 
 The difference between 'put' and 'put_objects' is that when called
 with no objects, 'put' does nothing, while 'put_objects' stores all
 persistent objects
+
+=head3 del
+
+ Title   : del
+ Usage   : $autodb->del(@objects)
+ Function: Delete one or more objects from memory and database
+ Returns : nothing
+ Args    : list of persistent objects, Oids, or OidDeleteds
+ Notes   : nop (does nothing) on OidDeleteds
 
 =head2 Manage database schema 
 
@@ -1262,6 +1434,7 @@ your objects are thawed before invoking the methods.
  Returns : nothing
  Args    : none
  Notes   : Deprecated.  Should use $autodb->put($object)
+           Legal to invoke on Oid or OidDeleted but does nothing
 
 =head3 oid
 
@@ -1271,6 +1444,7 @@ your objects are thawed before invoking the methods.
  Returns : oid as number, NOT Class::AutoDB::Oid object
  Args    : none
  Notes   : Deprecated.  Should use $autodb->oid($object)
+           Also works on Oid or OidDeleted
 
 =head1 SEE ALSO
 
@@ -1321,35 +1495,24 @@ testing but may be too severe for normal installs.
 You can only have one active AutoDB object at a time.  Grievous errors
 will occur if you run 'new' a second time on a different database.
 
-=item 4. No delete operation
-
-This is on our to-do list!  The issue that's held this up is that
-deletion is not a Perl concept -- you never have to delete a Perl
-object -- and it's not obvious how to make it intuitive for
-applications to handle deleted persistent objects.  In our running
-example, suppose you delete a Person Joe who's on Mary's friends list.
-When processing Mary's friends, what should happen to Joe?  Should we
-silently delete him from the list?  Or should we leave him on the list
-but return undef when your program accesses him?  Or something else?
-
-=item 5. No transactions
+=item 4. No transactions
 
 This is also on our to-do list, but further down, as we have no urgent
 need for transactions in our application.
 
-=item 6. Type mismatches
+=item 5. Type mismatches
 
 If data of the wrong type is stored in a search key, data conversion
 occurs as described in L<Type mismatches>.
 
-=item 7. Class attributes not stored or retrieved
+=item 6. Class attributes not stored or retrieved
 
 Class attributes (as that term is used in L<Class::AutoClass>) are not
 stored in the AutoDB database and are not set when objects are fetched
 or classes 'used'. This is related to the simple way class attributes
 are handled in Class::AutoClass.
 
-=item 8. Uneven error checking
+=item 7. Uneven error checking
 
 The software does not consistently check for user errors. If you make
 a mistake and pass in bad data. the software sometimes responds with
@@ -1357,6 +1520,15 @@ an intelligible error message but often does not.  All too often, the
 mistake winds its way into the guts of the software which ultimately
 dies with an inscrutable message.
  
+=item 8. Pollution of user class namespace
+
+The current design requires that persistent classes be subclasses of
+Class::AutoDB::Object; we ensure this by pushing the required class
+onto @ISA if it's not already there.  This has the unfortunate side
+effect of polluting the persistent classes' namespace with every
+method in Class::AutoDB::Object and above.  This is only a problem
+when user classes employ multiple inheritance.
+
 =back
 
 =head1 DEVELOPMENT ROADMAP
@@ -1365,77 +1537,119 @@ Subject to change, of course.  You will notice, I'm sure, that no dates are atta
 
 =begin html
 
-<h2>1.20 database operations</h2>
-<h3>'del' operation - a bit messy since object deletion is not a Perl concept!</h3>
+<h2>1.25 (items deferred from 1.20) - improve build &amp; test process to work better with CPAN</h2>
 <ul>
-<li>messy since object deletion is not a Perl concept!</li>
-<li>similar issues aries with weak references. I think Perl causes deref of lost reference to return undef</li>
-<ul>
-<li>this has to complicate the application (see notes below).  but is there a better choice??</li>
-<li>See Hash::NoRef for weak cache -- not sure if this comment is still relevant</li>
+<li>incorporate Test::Database</li>
+<li>add 'configure' to Build process to assist with choosing test database</li>
 </ul>
-<li>Database part is easy: delete object from object table and all collections (should consult saved registry for full list of collections that may contain the object)</li>
-<li>Object cache is a little tricky: if the oid is present in the cache as an Object, deflate it to an Oid; if it's present as an Oid, do nothing.</li>
-<li>Hard part is that other in-memory or in-database objects may contain references to the deleted object.</li>
+<h2>1.30 multiple AutoDBs</h2>
 <ul>
-<li>Serialize::fetch handles this case fine - it returns undef</li>
-<li>Have to check everywhere in our code that does 'fetch' or 'really_fetch' to make sure undef is handled.</li>
-<li>One place is in Cursor::get - obvious action is to skip undefs</li>
-<li>Harder case is Oid::AUTOLOAD - the simplest action would be to return undef to the application, but this is misleading: the app said something like $obj-&gt;xxx expecting to get the 'xxx' attribute; giving him undef suggests that 'xxx' is undef, not that $obj is deleted!  Perhaps we should throw an exception, but can the app catch it??</li>
+<li>Allow program to have multiple AutoDB objects, connected to different databases</li>
+<li>Objects fetched from a given database are, by default, put back there</li>
+<li>Probably also possible for ‘put’ to specify which database gets the object</li>
+<li>Another approach is to associate classes with specific AutoDBs</li>
+<ul>
+<li>this would handle our current hottest use case, which is to let Babel and Pipeline operate together but with different AutoDBs</li>
 </ul>
+<li>Big problem is schema registration. Presently, schemas are auto- registered in default database.  With new scheme, how does program conveniently control this?</li>
 </ul>
-<h3>Easy database things (raw SQL in 'find' and other improvements to 'find' queries)</h3>
+<h2>1.40 namespace issues</h2>
 <ul>
-<li>Allow raw SQL</li>
+<li>clean up namespace imposed on user-objects (maybe in AutoClass, too)</li>
+<li>I tried in 1.20 to get partial solution by pushing Class::AutoDB::Object onto the end of user class's @ISA, instead of unshifting it onto the front. DOESN'T WORK!</li>
 <ul>
-<li>Extremely easy - the code is already set up to do it.  See Cursor::select_sql and Cursor::count_sql</li>
+<li>It does that okay, but introduces a new bug: oid generation and all that is doen by Serialize which is a base class of Object. </li>
+<li>With Object at the front of @ISA, that happens early; with Object at the end of @ISA, it happens late.  </li>
+<li>This screws up a lot of things.:(</li>
 </ul>
-<li>Allow arbitrary MySQL types</li>
+<li>look at method resolution order (mro) material</li>
+<li>refactor Object, Serialize, and rethink where we generate oid and put object into cache</li>
 <ul>
-<li>Should be done in conjunction with cleaning up the type stuff in Table</li>
+<li>Object shouldn't inherit from Serialize or AutoClass</li>
+<li>to cleanup namespace want Object to have minimal methods (perhaps just 'put' and 'oid' since these are needed for compatibility) and to come late in @ISA</li>
+<li>but, we need to generate oid and put object into cache early</li>
+<ul>
+<li>see discussion of bug introduced when I tried pushing Object onto end of @ISA.  point is that </li>
 </ul>
-<li>AND'ing new query onto Cursor</li>
-<li>let empty query retrieve all objects.  ie $autodb-&gt;get</li>
-<li>DBI::quote seems to be quoting numbers - I wonder if this is correct</li>
+<li>it seems clear we need to split these roles somehow..</li>
 </ul>
-<h3>consider new serialization schemes</h3>
+<li>BTW  'get' applied to Oid accidentally does (almost) the right thing!</li>
 <ul>
-<li>want to handle ties. at least, Hash::AutoHash and friends</li>
-<li>Storable may be viable</li>
-<ul>
-<li>looks like new 'attach' hook gives us what we need. another plus is that it handles ties.</li>
-<li>a plus is that Storable handled ties</li>
-<li>problem is that output is not human readable</li>
-</ul>
-<li>do a combination of Storable for the heavy lift and DD to produce readable form</li>
-</ul>
-<h3>Table</h3>
-<ul>
-<li>Refactor TYPES - currently duplicated in several modules - a real landmine waiting to go off!</li>
-<li>Provide utility methods for working with types</li>
-<li>Might be better to let Table do the database ops itself rather than just generating SQL - doesn't matter much now, but may make statement handles easier to manage</li>
-</ul>
-<h3>add 'configure' to Build process</h3>
-<h2>1.30 namespace issues</h2>
-<h3>clean up namespace imposed on user-objects (maybe in AutoClass, too)</h3>
-<ul>
-<li>we currently splice Class::AutoDB::Object into user-class's @ISA.  Object, in turn, inherits from Serialize.  this is a bad idea that puts a lot of methods in user namespace</li>
-<ul>
-<li>the code depends on this, among other things, to know whether a class is persistent. the code also uses this to gain access to methods like 'fetch' and 'thaw'</li>
-<li>we want to stop this, which will, of course, require finding another way to tell whether a class is persistent and to invoke 'fetch', 'thaw', etc.</li>
+<li>fetches object, then runs 'get' method on thawed object</li>
+<li>'get', if not overridden, is AutoClass::get.  </li>
+<li>returns empty ARRAY or list, since no attributes specified</li>
+<li>'almost the obvious thing' - user probably expects object to be returned...</li>
 </ul>
 <li>it would be nice to continue providing convenience methods in user namespace: 'put', 'oid', and maybe 'autodb'.</li>
 <ul>
 <li>it must be okay for user to override these, which means our code must never call them. I think this is already the case</li>
 <li>the hard problem is what to do when invoked on Oids. </li>
 <li>presently, the Oid versions of these are hardcoded. to do it right, Oid code has to check whether user has overridden the method; if so, has to fetch and re-dispatch to user object</li>
+<li>OR: let user specify whether method, when invoked on Oid, has to fetch the object</li>
+<ul>
+<li>at present, 'put' on Oid does not fetch object; what if user wants to define 'put' method that should fetch object.  or wants to call 'put' something else but not fetch object</li>
+</ul>
 <li>instead of, or in addition to, 'autodb' method on user-objects, have AutoDB provide this as an exported function.</li>
 <ul>
 <li>think though implications when we allow multiple active AutoDB objects</li>
 </ul>
+<li>consider this scenario: we splice Object onto class A's @ISA; B inherits from A &amp; C; C overrides 'put'. will Perl see Object::put or C::put?</li>
+</ul>
+<li>small cleanups</li>
+<ul>
+<li>rationalize use of oid-&gt;{_CLASS}</li>
+<li>standardize idiom for allowing call as object or class method, or function</li>
+<ul>
+<li>standardize use of Serialize methods as class methods vs. functions</li>
+<li>perhaps include internal functions for case where call as function already known...</li>
+<li>accepted idiom is for wrapper to say 'goto &amp;inner'</li>
+</ul>
+<li>unify AutoDB &amp; Serialze interfaces as a first step toward making Serialize a standalone package</li>
+<ul>
+<li>give Serialize methods get, put, del, etc.</li>
+<li>maybe change Serialize fetch/store to get/put in the interest of consistency.</li>
 </ul>
 </ul>
-<h3>AutoDB methods to list objects (or maybe oids??) -- this is a 'maybe' item</h3>
+<li>arrange for Oids to delegate methods like 'can' and 'isa' to real class -- same scheme as for AutoHash</li>
+</ul>
+<h2> 1.50 general cleanup -- items will probably be moved around</h2>
+<ul>
+<li>'purge' - remove deleted objects from database - likely to slip to 1.30</li>
+<ul>
+<li>3 flavors of increasing cost</li>
+<ul>
+<li>purge from _AutoDB - trivial (but dangerous for app, since all future references to deleted object will generate the famous 'trying to deserialize...' error)</li>
+<ul>
+<li>DELETE FROM _AutoDB WHERE object IS NULL</li>
+</ul>
+<li>purge from collections</li>
+<ul>
+<li>use Registry to find all collections with keys of type 'object'</li>
+<li>update each collection to remove the offending objects</li>
+<li>for BaseTables, set column to NULL</li>
+<li>for ListTables, delete the row</li>
+</ul>
+<li>purge from objects</li>
+<ul>
+<li>get all objects into memory</li>
+<li>traverse each object looking for deleted objects</li>
+<li>not sure what to do with them: </li>
+</ul>
+</ul>
+</ul>
+<li>rethink decision to let 'put' leave oids to deleted objects in search keys</li>
+<ul>
+<li>rationale: obviously, cannot ensure that all oids in keys are for extant objects. why agonize over getting ti right for some keys?</li>
+<li>on the other hand, if user goes to the trouble of getting objects, deleting some elements, then putting objects back, perhaps we should be willing to clean-up the object on the way out the door...</li>
+</ul>
+<li>make Serialize a standalone package</li>
+<ul>
+<li>like AutoDB, maintains shared object structures</li>
+<li>doesn't have Collections</li>
+<li>this is first step toward supporting additional serialization options (eg, Storable), and different storage systems (eg, BerkeleyDB)</li>
+</ul>
+<li>add tests for connection management, eg, in 060.connections</li>
+<li>AutoDB methods to list objects (or maybe oids??) -- this is a 'maybe' item</li>
 <ul>
 <li>mem_objects -- all persistent objects in memory -- these are the ones that will be put by put_objects</li>
 <li>db_objects -- objects in database -- gets 'em all as Oids</li>
@@ -1444,19 +1658,36 @@ Subject to change, of course.  You will notice, I'm sure, that no dates are atta
 <li>db_only_objects</li>
 <li>del_objects -- someday -- deleted objects -- here is where 'oids' makes more sense than 'objects'</li>
 </ul>
-<h2>1.40 improved put/get; performance improvements</h2>
-<h3>New thoughts on 'put' -- batch 'put' is super performance win</h3>
+<li>investigate class2colls bug - is this still open?</li>
 <ul>
+<li>Assumes registers happen top-down which is not guaranteed</li>
+<li>Top-down order will happen as expected if sub-classes use their parents.  I believe this is necessary anyway, else the attribute methods will not be defined…</li>
+</ul>
+<li>Table/MySQL types</li>
+<ul>
+<li>Refactor TYPES – currently duplicated in several modules – a real landmine waiting to go off!</li>
+<li>Provide utility methods for working with types</li>
+<li>Might be better to let Table do the database ops itself rather than just generating SQL – doesn’t matter much now, but may make statement handles easier to manage</li>
+<li>Allow arbitrary MySQL types</li>
+</ul>
+<li>AND’ing new query onto Cursor - low priority</li>
+<li>let alter drop columns - low priority</li>
+</ul>
+<h2>1.60 improved put/get; performance improvements</h2>
+<ul>
+<li>New thoughts on ‘put’ -- batch 'put' is super performance win</li>
+<ul>
+<li>Auto-put seems a hopeless goal.  Too bad…</li>
 <li>Improve efficiency of put_objects method and add ability to feed in list of objects. Should really be done as part of put-policy</li>
 <ul>
-<li>By default, $ob-&gt;put doesn't write the object immediately, but rather puts it on a queue for later writing</li>
+<li>By default, $ob-&gt;put doesn’t write the object immediately, but rather puts it on a queue for later writing</li>
 <li>$autodb-&gt;put does actual writes. Called automatically by $autodb-&gt;close and maybe destructor if we can get this to work.</li>
-<li>In the full scheme of things, 'put' can specify queue so that objects can be written at different times. This could grow into a limited transaction capability.</li>
+<li>In the full scheme of things, ‘put’ can specify queue so that objects can be written at different times. This could grow into a limited transaction capability.</li>
 <li>$obj-&gt;put could also specify whether current state of object should be written, or state as it exists when $autodb-&gt;put is called. The latter option is really another way of saying, “$obj is dirty” and is a backdoor way of approximating auto-put.</li>
 <li>For performance, $autodb-&gt;put presumably will sort database operations by table and do updates in batches</li>
 <li>Ideally want to group updates by table and do each table in bulk.</li>
-<li>This is going to be a pain - have to refactor code to collect SQL bits and pieces and put them together at the top. Will affect a lot of tests…</li>
-<li>Here's a plausible design.</li>
+<li>This is going to be a pain – have to refactor code to collect SQL bits and pieces and put them together at the top. Will affect a lot of tests…</li>
+<li>Here’s a plausible design.</li>
 <ul>
 <li>Each table has methods to</li>
 <li>also need to collect list of tables with pending updates. This could be attached to the autodb</li>
@@ -1470,76 +1701,131 @@ Subject to change, of course.  You will notice, I'm sure, that no dates are atta
 <li>Class::AutoDB::Object:::put calls Collection::put on each object which calls BaseTable::put and ListTable::put</li>
 </ul>
 </ul>
-<li>'dirty bit' put policy</li>
+<li>‘dirty bit’ put policy</li>
 <ul>
-<li>May be better to think of this as 'deferred put'.</li>
-<li>When code decides that object is dirty, puts it on a list of objects to be 'put'</li>
+<li>May be better to think of this as ‘deferred put’.</li>
+<li>When code decides that object is dirty, puts it on a list of objects to be ‘put’</li>
 <li>Later, perhaps during $autodb-&gt;put, the actual database updates occur</li>
 </ul>
-<li>Look at renaming put_objects to 'put'. This will simply work.  Just need synonym and add to tests</li>
+<li>Look at renaming put_objects to ‘put’. This will simply work.  Just need synonym and add to tests</li>
 <li>re-get (or maybe refresh) to get current value of object from database</li>
+<li>putting object with references to objects that are never put - at least mention this in POD</li>
+<ul>
+<li>not sure if this is a bug or a mis-feature</li>
+<li>in the SYNOPSIS example, suppose $joe is put, but his friends are not</li>
+<li>when 'Joe' is later retrieved, his friends will point to non-existent objects. derefing these gives rise to the dreaded "Trying to deserialize..." error</li>
+<li>the obvious solution is to automatically put such objects, but this leads to an asymmetry between the handling of new objects vs updates to old ones: the former are automatically 'put' while the latter are not...</li>
+<li>there's also the practical problem on implementing this feature without getting into an infinite loop, but I think I know how to avoid this</li>
 </ul>
-<h3>Performance improvements for 'get'</h3>
+<li>Smarter putting (now obsolete)</li>
+<ul>
+<li>Decide on mechanism for detecting changed objects</li>
+<ul>
+<li>Explicitly set dirty bit – easiest for us, hardest for user</li>
+<li>Maintain copies of objects when read from database, and compare current value to copy. Have to do this for both the serialized and ‘relational-ized’ versions of object, since search keys can be virtual (e.g., ‘friends_names’ could reach into friends objects to get names).  Note: Data::Dumper has mode for storing keys in sorted order</li>
+<li>TIEd ARRAY and HASH implementations.  Probably not too hard, but users would have to use these classes instead of built-in types</li>
+</ul>
+<li>Implement read_only.  Or do this as part of put_policy</li>
+<li>put_policy—controls which objects are put</li>
+<ul>
+<li>auto vs. manual – auto probably means “during AutoDB::put_object”</li>
+<li>dirty vs. all vs. none (none would be set by read_only)</li>
+<li>reachable (yes/no) – yes means, “put all objects reachable from the start”</li>
+<li>Perhaps we should have system-wide default, plus ability to override in AutoDB, plus ability to override per-class, plus ability to override per-object</li>
+</ul>
+<li>Selectable persistence</li>
+<ul>
+<li>Make it possible to specify on a per object basis whether the object should be persistent. This would simplify the Registry code, for example, by allowing separate persistent vs. transient registries</li>
+</ul>
+</ul>
+</ul>
+<li>Performance improvements for 'get'</li>
 <ul>
 <li>may be useful to let object provide list of "related objects" and get them all at once</li>
 </ul>
-<h3>Use statement handles in Serialize and Table to improve performance</h3>
-<h3>design concurrency/transaction scheme -- will be implemented later</h3>
-<h2>1.50 better collections; class extents, etc.</h2>
-<h3>class attributes </h3>
+<li>Use statement handles in Serialize and Table to improve performance</li>
+<li>design concurrency/transaction scheme -- will be implemented later</li>
+</ul>
+<h2>1.70 better collections; class extents, etc.</h2>
+<ul>
+<li>class attributes </li>
 <ul>
 <li>not set when class 'used' in the course of fetching objects. see discussion under AutoClass</li>
 <li>AutoDB does not store class attributes</li>
 <li>related to simple way class attributes handled in AutoClass</li>
 </ul>
-<h3>Test subclass w/o collection, i.e., transients only</h3>
-<h3>Class extents</h3>
+<li>Test subclass w/o collection, i.e., transients only</li>
+<li>See if collection=&gt;__PACKAGE__ can work</li>
+<ul>
+<li>Have to construct table name from package name</li>
+<li>Convert :: to _ or something</li>
+<li>Worry about restriction on length</li>
+</ul>
+<li>Consider extending register to take 'classes' parameter (instead of just 'class'). looks easy, but how useful??</li>
+<li>Class extents</li>
 <ul>
 <li>implement as more or less standard list table, e.g. _AutoDB_classes(class,oid)</li>
-<li>Specify via a flag in &#37AUTODB</li>
+<li>Specify via a flag in %%AUTODB</li>
 <li>subclasses have to insert in parent extents</li>
 </ul>
-<h2>1.60 multiple AutoDBs</h2>
-<h3>Allow program to have multiple AutoDB objects, connected to different databases</h3>
-<h3>Objects fetched from a given database are, by default, put back there</h3>
-<h3>Probably also possible for 'put' to specify which database gets the object</h3>
-<h3>Big problem is schema registration. Presently, schemas are auto- registered in default database.  With new scheme, how does program conveniently control this?</h3>
-<h2>1.70 oid management</h2>
-<h3>Current scheme -- generate unique id in Perl, use MySQL 'replace' to insert or update.  (Note: MySQL's 'insert… on duplicate key update' is a better choice, but it's only available from 4.1)  Problems:</h3>
+</ul>
+<h2>1.80 oid management</h2>
 <ul>
-<li>The database will be seriously corrupted if a new oid isn't unique!!</li>
-<li>'replace' isn't available in Postgres; will either need extra 'select' or stored procedure -- is this still true?</li>
+<li>Current scheme -- generate unique id in Perl, use MySQL ‘replace’ to insert or update.  (Note: MySQL’s ‘insert… on duplicate key update’ is a better choice, but it’s only available from 4.1)  Problems:</li>
+<ul>
+<li>The database will be seriously corrupted if a new oid isn’t unique!!</li>
+<li>‘replace’ isn’t available in Postgres; will either need extra ‘select’ or stored procedure -- is this still true?</li>
 <li>'replace' is available in SQLite</li>
 </ul>
-<h3>Alternative - get sequence number from database</h3>
-<h3>Another goal: ensure uniqueness of oids constructed on different machines, so databases can be safely merged...</h3>
-<h3>Option 1 - do it when object constructed</h3>
+<li>Alternative – get sequence number from database</li>
+<li>Another goal: ensure uniqueness of oids constructed on different machines, so databases can be safely merged...</li>
+<li>Option 1 – do it when object constructed</li>
 <ul>
-<li>Problem - extra trip to database</li>
-<li>Benefit - every update to object (even first) is a database 'update' - works for MySQL and Postgres</li>
+<li>Problem – extra trip to database</li>
+<li>Benefit – every update to object (even first) is a database ‘update’ – works for MySQL and Postgres</li>
 </ul>
-<h3>Option 2 - do it when object stored</h3>
+<li>Option 2 – do it when object stored</li>
 <ul>
-<li>Benefit - avoids extra trip to database</li>
-<li>Problem - self-referential objects are complicated.  If freeze code encounters the same object twice during serialization, there won't be an oid yet.  The obvious recursion (if object doesn't have oid, then store it) leads to infinite loop.  Probably need to maintain a hash of 'in-progress' objects; if freeze encounters an in-progress object, it has to do a dummy insert just to get the oid.</li>
+<li>Benefit – avoids extra trip to database</li>
+<li>Problem – self-referential objects are complicated.  If freeze code encounters the same object twice during serialization, there won’t be an oid yet.  The obvious recursion (if object doesn’t have oid, then store it) leads to infinite loop.  Probably need to maintain a hash of ‘in-progress’ objects; if freeze encounters an in-progress object, it has to do a dummy insert just to get the oid.</li>
 </ul>
-<h2>1.80 persistent big HASH and ARRAY</h2>
-<h3>persistent HASH</h3>
-<h3>persistent ARRAY --  harder because of shifts &amp; splices!!</h3>
+</ul>
+<h2>1.90 persistent big HASH and ARRAY</h2>
+<ul>
+<li>persistent HASH</li>
+<li>persistent ARRAY --  harder because of shifts &amp; splices!!</li>
 <ul>
 <li>(see also implementation of BerkeleyDB recno files)</li>
-<li>The obvious implementation is to give ARRAY elements an 'array_index' key, starting at 0.</li>
+<li>The obvious implementation is to give ARRAY elements an ‘array_index’ key, starting at 0.</li>
 <li>So long as you just do pushes and pops, the array will grow and shrink on high end, and the mapping from Perl array index to database array index is trivial</li>
 <li>But, when a shift is done, the element at the low end disappears and now the 0th Perl element has database index 1</li>
 <li>So, we need a translation mechanism that maps Perl index values into database index values</li>
-<li>In general, splice can introduce 'holes' and 'bumps' into the mapping: e.g., if you delete 10 elements from the middle of the ARRAY, the bordering Perl index values will differ by 10 in the database; or if you add 10 elements to the middle of the ARRAY, the database indexes assigned to these guys will be discontinuous from their neighbors</li>
+<li>In general, splice can introduce ‘holes’ and ‘bumps’ into the mapping: e.g., if you delete 10 elements from the middle of the ARRAY, the bordering Perl index values will differ by 10 in the database; or if you add 10 elements to the middle of the ARRAY, the database indexes assigned to these guys will be discontinuous from their neighbors</li>
 <li>Blech…</li>
 <li>Possible implementation: translation table is a list of &lt;count, database index&gt; pairs.  Meaning is that the first/next count elements have database indexes index, index+1,…, index+count-1</li>
 <li>In usual case (no general splices), table has one entry</li>
 </ul>
-<h3>make sure design will work with concurrency</h3>
-<h2>2.00 port to SQLite or other DBMS</h2>
-<h2>2.10 concurrency/transactions</h2>
+<li>make sure design will work with concurrency</li>
+</ul>
+<h2>2.00 serialization engines</h2>
+<ul>
+<li>want to handle ties. at least, Hash::AutoHash and friends</li>
+<li>Storable may be viable</li>
+<ul>
+<li>looks like new 'attach' hook gives us what we need. another plus is that it handles ties.</li>
+<li>problem is that output is not human readable</li>
+</ul>
+<li>do a combination of Storable for the heavy lift and DD to produce readable form</li>
+<li>use Rmap to convert refs into Oids, producing a clean copy that can be directly DD'ed. will need the converse, too, of course.</li>
+<li>max_allowed_packet is a landmine waiting to go off</li>
+<ul>
+<li>possible solution is to split serialized forms into segments, each &lt; max size</li>
+<li>the 'replace' statement that updates _AutoDB will have to be smarter, too</li>
+</ul>
+</ul>
+<h2>2.10 port to SQLite or other DBMS</h2>
+<h2>3.00 concurrency/transactions</h2>
+
 
 =end html
 
