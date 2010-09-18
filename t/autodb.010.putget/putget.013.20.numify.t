@@ -1,10 +1,9 @@
 ########################################
-# create and put some objects for testing deferred thawing
-# this set (10, 11) checks that stringification causes thaw. this includes
-#   double quotes, bool, and string comparison ops (cmp, eq, etc)
+# this set (20, 21) tests overloaded 'numify' operations, ie, numeric comparisons
+# this script creates and puts the objects
 # scheme is to create a root object pointing to test objects: 
-#   1 test object each for double quotes and bool, 2 for each binary op.
-#   thaw them one-by-one. at end, make sure there's only one copy of each object.
+#   2 for each binary op.
+#   compare the pairs. make sure not thawed
 ########################################
 use t::lib;
 use strict;
@@ -17,7 +16,7 @@ use putgetUtil; use Mechanics;
 
 my($put_type)=@ARGV;
 # NG 10-09-17: added bool
-my @object_names=qw(root quotes bool cmp cmp lt lt le le eq eq ge ge gt gt ne ne);
+my @object_names=qw(root cmp cmp lt lt le le eq eq ge ge gt gt ne ne);
 my $num_objects=scalar @object_names;
 defined $put_type or $put_type='put';
 

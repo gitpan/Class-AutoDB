@@ -1,6 +1,7 @@
 #!perl
 use strict;
 use Test::More tests =>17;
+use DBI;
 # make sure all the necesary modules exist
 BEGIN {
     use_ok( 'Class::AutoDB' );
@@ -21,5 +22,9 @@ BEGIN {
     use_ok('Class::AutoDB::Serialize');
     use_ok('Class::AutoDB::Table');
 }
-diag( "Testing Class::AutoDB $Class::AutoDB::VERSION, Perl $], $^X" );
+my $dbh=DBI->connect("dbi:mysql:",undef,undef,
+		     {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,});
+my($mysql)=$dbh->selectrow_array(qq(SELECT VERSION()));
+diag( "Testing Class::AutoDB $Class::AutoDB::VERSION, Perl $], $^X, MySQL $mysql" );
+
 done_testing();

@@ -17,7 +17,7 @@ my $dbh=DBI->connect("dbi:mysql:database=test",undef,undef,
 is($DBI::errstr,undef,'connect');
 Class::AutoDB::Serialize->dbh($dbh);
 
-my @ids=keys %id2oid;;
+my @ids=keys %id2oid;
 my @oids=values %id2oid;
 my @objs=map {conjure_oid($_,'Oid','Persistent')} @oids;
 my $oids=join(', ',@oids);

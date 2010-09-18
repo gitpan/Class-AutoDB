@@ -118,15 +118,13 @@ sub stringify {
   my $obj=Class::AutoDB::Serialize::fetch($oid);
   "$obj";
 }
-# Code below adapted from Graph v0.67
 # NG 10-09-11: removed eq, ne. Perl autogenerates from stringify
 # NG 10-09-11: changed bool to force fetch
-# sub eq {"$_[0]" eq "$_[1]"}
-# sub ne {"$_[0]" ne "$_[1]"}
+# NG 10-09-17: added '0+' (convert to number), since Perls >= 5.10 stringify objects otherwise
 use overload
   '""' => \&stringify,
+  '0+' => sub {refaddr($_[0])},
   'bool'=>sub {length(stringify($_[0]))>0},
-  # 'eq' => \&eq,
-  # 'ne' => \&ne,
   fallback => 'TRUE';
 ####################
+1;

@@ -22,7 +22,9 @@ Class::AutoDB::Serialize->dbh($dbh);
 my($old_count)=$dbh->selectrow_array(qq(SELECT COUNT(oid) FROM _AutoDB;));
 
 # make some persistent objects & store them
-my $NUMOBJS=8;
+# NG 10-09-17: need 8 more objects for testing numeric comparisons
+# my $NUMOBJS=8;
+my $NUMOBJS=16;
 my @objs=map {new Persistent(name=>"p$_",id=>id_next())} (0..$NUMOBJS-1);
 map {Class::AutoDB::Serialize->store($_)} @objs;
 

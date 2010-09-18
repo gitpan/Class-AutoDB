@@ -106,6 +106,8 @@ t/autodb.010.putget/putget.013.00.thaw.t
 t/autodb.010.putget/putget.013.01.thaw.t
 t/autodb.010.putget/putget.013.10.stringify.t
 t/autodb.010.putget/putget.013.11.stringify.t
+t/autodb.010.putget/putget.013.20.numify.t
+t/autodb.010.putget/putget.013.21.numify.t
 t/autodb.010.putget/putget.014.00.update_thaw.t
 t/autodb.010.putget/putget.014.01.update_thaw.t
 t/autodb.010.putget/putget.014.02.update_thaw.t
@@ -182,6 +184,14 @@ t/autodb.015.del/del.011.30.put.t
 t/autodb.015.del/del.011.31.delobj.t
 t/autodb.015.del/del.012.00.mechanics.t
 t/autodb.015.del/del.012.01.mechanics.t
+t/autodb.015.del/del.013.00.thaw.t
+t/autodb.015.del/del.013.01.thaw.t
+t/autodb.015.del/del.013.02.thaw.t
+t/autodb.015.del/del.013.03.thaw.t
+t/autodb.015.del/del.013.10.stringify.t
+t/autodb.015.del/del.013.11.stringify.t
+t/autodb.015.del/del.013.20.numify.t
+t/autodb.015.del/del.013.21.numify.t
 t/autodb.015.del/del.016.00.no_keys.t
 t/autodb.015.del/del.016.01.no_keys.t
 t/autodb.015.del/del.016.10.some_keys.t

@@ -1,5 +1,6 @@
 package Class::AutoDB::OidDeleted;
 use Carp;
+use Scalar::Util qw(refaddr);
 use base qw(Class::AutoDB::Oid);
 
 # oid, put defined in Oid. 
@@ -37,15 +38,14 @@ sub AUTOLOAD {
 # stringify to empty string, just like undef would
 sub stringify {''}
 
-# # Code below adapted from Graph v0.67
+# since OidDeleted isa Oid, entries that are identical to those in Oid could be omitted.
+# I'm keeping them out of an abundance of caution 
 # NG 10-09-11: removed eq, ne. Perl autogenerates from stringify
-# sub eq {"$_[0]" eq "$_[1]"}
-# sub ne {"$_[0]" ne "$_[1]"}
+# NG 10-09-17: added '0+' (convert to number), since Perls >= 5.10 stringify objects otherwise
 use overload
   '""' => \&stringify,
+  '0+' => sub {refaddr($_[0])},
   'bool'=>sub {undef},
-  # 'eq' => \&eq,
-  # 'ne' => \&ne,
   fallback => 'TRUE';
 ####################
 1;

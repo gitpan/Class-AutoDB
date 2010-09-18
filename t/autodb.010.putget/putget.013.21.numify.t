@@ -1,10 +1,9 @@
 ########################################
-# create and put some objects for testing deferred thawing
-# this set (10, 11) checks that stringification causes thaw. this includes
+# this set (20, 21) tests overloaded 'numify' operations, ie, numeric comparisons
 #   double quotes, and string comparison ops (cmp, eq, etc)
 # scheme is to create a root object pointing to test objects: 
-#   1 test object each for double quotes and bool, 2 for each binary op.
-#   thaw them one-by-one. at end, make sure there's only one copy of each object.
+#   2 for each binary op.
+#   compare the pairs. check result and make sure not thawed
 ########################################
 use t::lib;
 use strict;
@@ -18,7 +17,7 @@ use putgetUtil; use Mechanics;
 
 my($get_type)=@ARGV;
 # NG 10-09-17: added bool
-my @object_names=qw(root quotes bool cmp cmp lt lt le le eq eq ge ge gt gt ne ne);
+my @object_names=qw(root cmp cmp lt lt le le eq eq ge ge gt gt ne ne);
 my $num_objects=scalar @object_names;
 defined $get_type or $get_type='get';
 
@@ -43,7 +42,7 @@ my @test_objects=@actual_objects[1..$num_objects-1];
 is(scalar(@actual_objects),scalar(@correct_objects),
    "$label ".(scalar(@correct_objects)).' objects - sanity test');
 
-# NG 10-09-17: confirm that test objects present as Oids
+# confirm that test objects present as Oids
 my $ok=1;
 map {$ok&&=ok_objcache($_,'Oid','Mechanics',"$label object starts as Oid",
 		       __FILE__,__LINE__,'no_report_pass')} @test_objects;
@@ -53,35 +52,14 @@ report_pass($ok,"$label objects start as Oids - sanity test");
 my @correct_thawed=($root);
 cmp_thawed(\@actual_objects,\@correct_thawed,"$label thawed root");
 
-# test double quotes
-my $object=shift @test_objects;
-my $stringify="$object";	# force thaw
-push(@correct_thawed,$object);
-cmp_thawed(\@actual_objects,\@correct_thawed,"$label thawed quotes");
-
-# NG 10-09-17: added bool
-# test bool
-my $object=shift @test_objects;
-my $bool=$object? 1: 0;	# force thaw
-push(@correct_thawed,$object);
-cmp_thawed(\@actual_objects,\@correct_thawed,"$label thawed bool");
-
-# test the rest
-for my $op qw(cmp lt le eq ge gt ne) {
+# main tests
+for my $op qw(<=> < <= == >= > !=) {
   my($object0,$object1)=splice(@test_objects,0,2);
-  eval "\$object0 $op \$object1"; # force thaw
-  push(@correct_thawed,$object0,$object1);
-  cmp_thawed(\@actual_objects,\@correct_thawed,"$label thawed $op");
+  eval "\$object0 $op \$object1"; # should not thaw
+  my $ok=ok_objcache($object0,'Oid','Mechanics',"$label object0 not thawed",
+		     __FILE__,__LINE__,'no_report_pass');
+  $ok&&=ok_objcache($object1,'Oid','Mechanics',"$label object1 not thawed",
+		    __FILE__,__LINE__,'no_report_pass');
+  report_pass($ok,"$label not thawed $op");
 }
-
-my @reach=reach(@actual_objects);
-is(scalar @reach,$num_objects,"$get_type: one copy of each object at end");
-
-local $SIG{__WARN__}=sub {warn @_ unless $_[0]=~/^Deep recursion/;};
-local $DB::deep=0;
-
-# test the usual way for sanity
-$test->test_get(labelprefix=>"$get_type: usual test (for sanity)",
-		actual_objects=>\@actual_objects,correct_objects=>\@correct_objects);
-
 done_testing();

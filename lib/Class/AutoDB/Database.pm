@@ -179,10 +179,12 @@ sub create {
   my @sql;
   my $object_table=$self->object_table;
   # drop & recreate object table
-  push(@sql,(qq(drop table if exists $object_table),
-	     qq(create table $object_table (oid bigint unsigned not null,
-					    object longblob,
-					    primary key (oid)))));
+  # NG 10-09-17: added DROP VIEW
+  push(@sql,(qq(DROP TABLE IF EXISTS $object_table),
+	     qq(DROP VIEW IF EXISTS $object_table),
+	     qq(CREATE TABLE $object_table (oid BIGINT UNSIGNED NOT NULL,
+					    object LONGBLOB,
+					    PRIMARY KEY (oid)))));
   push(@sql,$registry->schema('create', $index_flag)); # create collections (drops tables first)
   $self->do_sql(@sql);		          # do it!
   $registry->saved($registry->current);	  # current version is now the real one
@@ -197,10 +199,12 @@ sub drop {
   my @sql;
   push(@sql,$registry->schema('drop'));	  # drop collections
   # drop & recreate object table
-  push(@sql,(qq(drop table if exists $object_table),
-	     qq(create table $object_table (oid bigint unsigned not null,
-					    object longblob,
-					    primary key (oid)))));
+  # NG 10-09-17: added DROP VIEW
+  push(@sql,(qq(DROP TABLE IF EXISTS $object_table),
+	     qq(DROP VIEW IF EXISTS $object_table),
+	     qq(CREATE TABLE $object_table (oid BIGINT UNSIGNED NOT NULL,
+					    object LONGBLOB,
+					    PRIMARY KEY (oid)))));
   $self->do_sql(@sql);		
   $registry=new Class::AutoDB::Registry; # reset registry
   $self->registry($registry);
@@ -215,10 +219,12 @@ sub alter {
   my $object_table=$self->object_table;
   my @sql;
   push(@sql,$registry->schema('alter'));  # alter collections
+  # NG 10-09-17: added DROP VIEW
   push(@sql,			          # create object table if necessary
-       qq(create table if not exists $object_table (oid bigint unsigned not null,
-						    object longblob,
-						    primary key (oid))));
+       qq(DROP VIEW IF EXISTS $object_table),
+       qq(CREATE TABLE IF NOT EXISTS $object_table (oid BIGINT UNSIGNED NOT NULL,
+						    object LONGBLOB,
+						    PRIMARY KEY (oid))));
   $self->do_sql(@sql);
   $registry->put;		          # store registry
   $self->_exists(1);

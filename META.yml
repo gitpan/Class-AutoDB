@@ -1,12 +1,7 @@
 ---
-name: Class-AutoDB
-version: 1.19_01
+abstract: 'Almost automatic object persistence coexisting with human-engineered database'
 author:
   - 'Nat Goodman <natg@shore.net>'
-abstract: Almost automatic object persistence coexisting with human-engineered database
-license: perl
-resources:
-  license: http://dev.perl.org/licenses/
 build_requires:
   Carp: 0
   Class::AutoClass: 1.53
@@ -31,27 +26,23 @@ build_requires:
   TAP::Harness: 3.12
   Test::Deep: 0.098
   Test::More: 0.88
-requires:
-  Carp: 0
-  Class::AutoClass: 1.54
-  Class::Singleton: 1.04
-  DBD::mysql: 4.007
-  DBI: 1.604
-  Hash::AutoHash::Args: 1.11
-  Scalar::Util: 1.01
-  Text::Abbrev: 1.01
-  Tie::ToObject: 0.03
 configure_requires:
   Cwd: 3.26
   DBD::mysql: 4.007
   DBI: 1.604
   File::Spec: 3.26
-  Module::Build: 0.34
+  Module::Build: 0.36
   SDBM_File: 0
+generated_by: 'Module::Build version 0.3603'
+license: perl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: Class-AutoDB
 provides:
   Class::AutoDB:
     file: lib/Class/AutoDB.pm
-    version: 1.19_01
+    version: 1.19_02
   Class::AutoDB::BaseTable:
     file: lib/Class/AutoDB/BaseTable.pm
   Class::AutoDB::Collection:
@@ -88,7 +79,16 @@ provides:
     file: lib/Class/AutoDB/Serialize.pm
   Class::AutoDB::Table:
     file: lib/Class/AutoDB/Table.pm
-generated_by: Module::Build version 0.34
-meta-spec:
-  url: http://module-build.sourceforge.net/META-spec-v1.4.html
-  version: 1.4
+requires:
+  Carp: 0
+  Class::AutoClass: 1.54
+  Class::Singleton: 1.04
+  DBD::mysql: 4.007
+  DBI: 1.604
+  Hash::AutoHash::Args: 1.11
+  Scalar::Util: 1.01
+  Text::Abbrev: 1.01
+  Tie::ToObject: 0.03
+resources:
+  license: http://dev.perl.org/licenses/
+version: 1.19_02

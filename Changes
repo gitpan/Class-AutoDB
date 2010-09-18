@@ -13,6 +13,19 @@ Revision history for Class-AutoDB
 	  tables, not views)
 	Many small cleanups in code and tests
 
+1.19_02 2010-09-17
+ 	Bug fixes
+	- added 'numify' to overloads in Oid and OidDeleted. arises because
+	  Perls >= 5.10 use stringify to autogenerate numify
+	  (Thanks to CPAN testers for finding this!)
+	- found a few more places where I drop tables and now have to also
+	  drop views
+	Changes to tests
+	- added code to emit MySQL version in 000.code_exists test
+	- check MySQL version in 150.dropview test and skip if version too
+	  old to support views
+	- added tests for overloaded numify
+
 1.11	2010-03-08
 	Changes to build and test process only.
 	Changes to Build.PL:
