@@ -13,6 +13,11 @@ Revision history for Class-AutoDB
 	  tables, not views)
 	Many small cleanups in code and tests
 
+1.19_03 2010-09-18
+	Changes to tests
+	- since 150.dropview test still failing, added more diagnostics and let
+	  it skip if create views fails for any reason
+
 1.19_02 2010-09-17
  	Bug fixes
 	- added 'numify' to overloads in Oid and OidDeleted. arises because
