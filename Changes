@@ -1,6 +1,6 @@
 Revision history for Class-AutoDB
 
-1.20	2010-TBD
+1.20	2010-09-20
         New features:
 	- 'del' method to delete objects
         - queries ('get', 'find', 'count') with no arguments retrieve/count all
@@ -12,11 +12,6 @@ Revision history for Class-AutoDB
 	  way when we create tables. (arises because DROP TABLE only drops 
 	  tables, not views)
 	Many small cleanups in code and tests
-
-1.19_03 2010-09-18
-	Changes to tests
-	- since 150.dropview test still failing, added more diagnostics and let
-	  it skip if create views fails for any reason
 
 1.19_02 2010-09-17
  	Bug fixes
