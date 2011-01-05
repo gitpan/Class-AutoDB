@@ -1,4 +1,4 @@
-# Regression test: runtime use
+# Regression test: runtime use. 010, 011 test put & get
 # all classes use the same collection. 
 # the 'put' test stores objects of different classes in the collection 
 # the 'get' test gets objects from the collection w/o first using their classes

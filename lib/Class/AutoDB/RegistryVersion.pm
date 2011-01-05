@@ -73,6 +73,13 @@ sub collection {
 }
 sub class2collections {
   my($self,$class)=@_;
+  # NG 11-01-05: make sure class already used, else class2collections not set
+  #              code adapted from Oid::AUTOLOAD
+  {
+    no strict 'refs';
+    unless (${$class.'::'}{AUTODB}) {
+    eval "require $class" or die $@;
+  }}
   my $collnames=$self->class2collnames->{$class} || [];
   my @collections=map {$self->collection($_)} @$collnames;
   wantarray? @collections: \@collections;
