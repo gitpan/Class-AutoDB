@@ -20,7 +20,7 @@ my $builder = $class->new
    license             => 'perl',
    dist_author         => q{Nat Goodman <natg@shore.net>},
    configure_requires=>{'Cwd' => 3.26,
-			'DBD::mysql' => 4.007,
+			# 'DBD::mysql' => 4.007,
 			'DBI' => 1.604,
 			'File::Spec' => 3.26,
 			'SDBM_File' => 0,
@@ -52,10 +52,11 @@ my $builder = $class->new
    requires =>         {'Carp' => 0,
 			'Class::AutoClass' => 1.54,
 			'Class::Singleton' => 1.04,
-			'DBD::mysql' => 4.007,
+			# 'DBD::mysql' => 4.007,
 			'DBI' => 1.604,
 			'Hash::AutoHash::Args' => 1.11,
 			'Scalar::Util' => 1.01,
+			'Storable' => 2.16,
 			'Text::Abbrev' => 1.01,	
 			'Tie::ToObject' => 0.03,
 		       },
@@ -110,6 +111,13 @@ $builder->create_build_script();
 # check whether MySQl test database is accessible
 # return error string if not
 sub chk_mysql {
+  # NG 11-01-07: added checks below from Data::Babel Build script
+  # make sure DBD::mysql is available. doesn't work to put in prereqs because
+  #  if not present, install tries to install 'DBD' which does not exist
+  # eval {use DBD::mysql 4.007};
+  eval "use DBD::mysql 4.007";
+  return "DBD::mysql not available:\n$@" if $@;
+
   # make sure we can talk to MySQL
   my $dbh;
   eval

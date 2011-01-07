@@ -28,7 +28,6 @@ build_requires:
   Test::More: 0.88
 configure_requires:
   Cwd: 3.26
-  DBD::mysql: 4.007
   DBI: 1.604
   File::Spec: 3.26
   Module::Build: 0.36
@@ -42,7 +41,7 @@ name: Class-AutoDB
 provides:
   Class::AutoDB:
     file: lib/Class/AutoDB.pm
-    version: 1.21
+    version: 1.22
   Class::AutoDB::BaseTable:
     file: lib/Class/AutoDB/BaseTable.pm
   Class::AutoDB::Collection:
@@ -83,12 +82,12 @@ requires:
   Carp: 0
   Class::AutoClass: 1.54
   Class::Singleton: 1.04
-  DBD::mysql: 4.007
   DBI: 1.604
   Hash::AutoHash::Args: 1.11
   Scalar::Util: 1.01
+  Storable: 2.16
   Text::Abbrev: 1.01
   Tie::ToObject: 0.03
 resources:
   license: http://dev.perl.org/licenses/
-version: 1.21
+version: 1.22

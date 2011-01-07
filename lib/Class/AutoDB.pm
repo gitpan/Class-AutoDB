@@ -10,7 +10,7 @@ use Class::AutoDB::Connect;
 use Class::AutoDB::Database;
 use Class::AutoDB::Registry;
 use Class::AutoDB::RegistryDiff;
-our $VERSION = '1.21';
+our $VERSION = '1.22';
 $VERSION=eval $VERSION;		# I think this is the accepted idiom..
 
 # NG 09-11-24: move Database first so AutoClass::get will not mask Database::get
@@ -30,12 +30,14 @@ Class::AutoClass::declare;
 
 use vars qw($AUTO_REGISTRY);	# TODO: move to Globals
 $AUTO_REGISTRY=new Class::AutoDB::Registry;
+our $GLOBALS=Class::AutoDB::Globals->instance();
 
+# usual case is compile time registration: autodb not yet set
 sub auto_register {
   my($args)=@_;
-  $AUTO_REGISTRY->register($args);
+  my $autodb=$GLOBALS->autodb;
+  $autodb? $autodb->register($args): $AUTO_REGISTRY->register($args);
 }
-our $GLOBALS=Class::AutoDB::Globals->instance();
 
 sub _init_self {
   my($self,$class,$args)=@_;
@@ -43,7 +45,12 @@ sub _init_self {
   $GLOBALS->autodb($self) unless $GLOBALS->autodb;
   return unless $self->is_connected; # connection handled in Class::AutoDB::Connect
   # NG 09-12-05: alter, index needed by register. find, get no longer supported
-  my($alter,$index)=@$args{qw(alter index)};
+  # NG 11-01-07: register allowed to alter if -create set
+  # my($alter,$index)=@$args{qw(alter index)};
+  # $self->set(create_param=>$create,alter_param=>$alter,index_param=>$index);
+  my($create,$alter,$index)=@$args{qw(create alter index)};
+  # NG 11-01-07: setting alter_param harder than it looks 'cuz of default semantics.. 
+  $alter=($alter||$create)? 1: (!defined $alter? undef: 0);
   $self->set(alter_param=>$alter,index_param=>$index);
   $self->manage_registry($args);
   # NG 09-12-05: find, get params no longer supported
@@ -233,7 +240,7 @@ Class::AutoDB - Almost automatic object persistence coexisting with human-engine
 
 =head1 VERSION
 
-Version 1.21
+Version 1.22
 
 =head1 SYNOPSIS
 

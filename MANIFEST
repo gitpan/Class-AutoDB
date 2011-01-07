@@ -401,7 +401,9 @@ t/autodb.130.runtime_use/runtime_use.010.put.t
 t/autodb.130.runtime_use/runtime_use.011.get.t
 t/autodb.130.runtime_use/runtime_use.020.put.t
 t/autodb.130.runtime_use/runtime_use.021.del.t
+t/autodb.130.runtime_use/runtime_use.030.schema.t
 t/autodb.130.runtime_use/RunTimeUseBad.pm
+t/autodb.130.runtime_use/RunTimeUseCollection.pm
 t/autodb.130.runtime_use/RunTimeUseOk.pm
 t/autodb.131.namespace.t.not-used
 t/autodb.150.dropview.t

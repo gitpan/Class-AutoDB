@@ -15,7 +15,9 @@ use Class::AutoDB::Serialize;
 my $GLOBALS=Class::AutoDB::Globals->instance();
 my $REGISTRY_OID=$GLOBALS->registry_oid;
 
-@AUTO_ATTRIBUTES=qw(autodb name2coll current saved diff);
+# NG 11-01-07: name2coll seems to be unused. all 'coll' methods delegate to current
+# @AUTO_ATTRIBUTES=qw(autodb name2coll current saved diff);
+@AUTO_ATTRIBUTES=qw(autodb current saved diff);
 @OTHER_ATTRIBUTES=qw(oid);
 %SYNONYMS=();
 %DEFAULTS=();

@@ -187,7 +187,18 @@ sub create {
 					    PRIMARY KEY (oid)))));
   push(@sql,$registry->schema('create', $index_flag)); # create collections (drops tables first)
   $self->do_sql(@sql);		          # do it!
-  $registry->saved($registry->current);	  # current version is now the real one
+  # NG 11-01-07: line below equates saved & current registry versions, making it impossible
+  #     to do diffs on runtime schema changes
+  #   my 1st attempt to fix was to just comment it out, reasoning it was unnecessary, 
+  #     since 'alter' (below) doesn't do it, and  caller invokes $registry->merge later 
+  #     which merges contents of schemas
+  #   this was wrong. caller invokes $registry->get earlier which sets saved schema to
+  #     value stored in database (d'oh -- it's called 'saved' schema after all:) 
+  #     having saved schema in hand is necessary if we want to delete existing collections
+  #     as part of create process -- dunno why we don't do this. maybe later
+  #   2nd try: careful deep copy current to saved
+  # $registry->saved($registry->current);	  # current version is now the real one
+  $registry->saved($registry->current->copy);     # current version is now the real one
   $registry->put;		          # store registry
   $self->_exists(1);
 }

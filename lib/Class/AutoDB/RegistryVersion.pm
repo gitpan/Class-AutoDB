@@ -2,6 +2,7 @@ package Class::AutoDB::RegistryVersion;
 use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS %DEFAULTS);
 use strict;
 # use Data::Dumper;
+use Storable qw(dclone);
 use Class::AutoClass;
 # use Hash::AutoHash::Args;
 use Class::AutoDB::Registration;
@@ -23,6 +24,20 @@ Class::AutoClass::declare(__PACKAGE__);
 #   my($self,$class,$args)=@_;
 #   return unless $class eq __PACKAGE__; # to prevent subclasses from re-running this
 # }
+
+# NG 11-01-07: added copy. needed to enable runtime schema changes
+#              deep copies state, except for 'registry'
+sub copy {
+  my $self=shift;
+  my $copy=new Class::AutoDB::RegistryVersion registry=>$self->registry;
+  while(my($key,$value)=each %$self) {
+    next if $key eq 'registry';
+    $value=dclone($value);
+    $copy->{$key}=$value;
+  }
+  $copy;
+}
+
 sub register {
   my $self=shift;
   my $registration=new Class::AutoDB::Registration(@_);
@@ -75,11 +90,10 @@ sub class2collections {
   my($self,$class)=@_;
   # NG 11-01-05: make sure class already used, else class2collections not set
   #              code adapted from Oid::AUTOLOAD
-  {
-    no strict 'refs';
-    unless (${$class.'::'}{AUTODB}) {
-    eval "require $class" or die $@;
-  }}
+  {no strict 'refs';
+   unless (${$class.'::'}{AUTODB}) {
+     eval "require $class" or die $@;
+   }}
   my $collnames=$self->class2collnames->{$class} || [];
   my @collections=map {$self->collection($_)} @$collnames;
   wantarray? @collections: \@collections;

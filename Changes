@@ -1,19 +1,34 @@
 Revision history for Class-AutoDB
 
-1.21	2011-TBD
+1.22	2011-01-07
+	Bug fixes
+	- when 'using' a class at runtime, schema changes were not happening;
+	  the common failure case was a class loaded at runtime that defines
+	  a collection
+	Changes to Build.PL
+	- added explicit test for DBD::mysql based on code in Data::Babel's
+	  Build.PL and removed from prereqs. it doesn't work to put in prereqs
+	  because if not present, install tries to install 'DBD' which does not 
+	  exist
+	Changes to tests
+	- declare.030.pct_autodb.t was not setting 'create' flag in call to
+	  'new'. longstanding bug that remained undetected because previous
+	  tests left the database in a state that didn't bother it
+
+1.21	2011-01-05
 	Bug fixes;
-	- when deleting objects whose classes were not yet 'used', the class-to-
-	  collection information was not yet set in the registry; as a result,
-	  the deletes were not applied to the objects' collections
+	- when deleting objects whose classes were not yet 'used', the deletes 
+	  were not being applied to the objects' collections; this was because
+	  the class-to-collection information was set in the registry
 
 1.20	2010-09-20
-        New features:
+        New features
 	- 'del' method to delete objects
         - queries ('get', 'find', 'count') with no arguments retrieve/count all
 	  objects. makes it possible to retrieve objects without defining
 	  collections
 	- raw SQL can be used in queries ('get', 'find', 'count')
-        Bug fixes:
+        Bug fixes
 	- drop views everywhere that we drop tables, so views will not get in
 	  way when we create tables. (arises because DROP TABLE only drops 
 	  tables, not views)
