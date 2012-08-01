@@ -67,7 +67,7 @@ push(@correct_thawed,$object);
 cmp_thawed(\@actual_objects,\@correct_thawed,"$label thawed bool");
 
 # test the rest
-for my $op qw(cmp lt le eq ge gt ne) {
+for my $op (qw(cmp lt le eq ge gt ne)) {
   my($object0,$object1)=splice(@test_objects,0,2);
   eval "\$object0 $op \$object1"; # force thaw
   push(@correct_thawed,$object0,$object1);

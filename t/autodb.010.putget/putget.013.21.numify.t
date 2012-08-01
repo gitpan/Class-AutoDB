@@ -53,7 +53,7 @@ my @correct_thawed=($root);
 cmp_thawed(\@actual_objects,\@correct_thawed,"$label thawed root");
 
 # main tests
-for my $op qw(<=> < <= == >= > !=) {
+for my $op (qw(<=> < <= == >= > !=)) {
   my($object0,$object1)=splice(@test_objects,0,2);
   eval "\$object0 $op \$object1"; # should not thaw
   my $ok=ok_objcache($object0,'Oid','Mechanics',"$label object0 not thawed",

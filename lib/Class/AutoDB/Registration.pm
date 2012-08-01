@@ -18,7 +18,7 @@ sub _init_self {
 
   # parse and normalize the various parameters
   my ($class_param,$coll_param,$keys_param,$tran_param)=
-    $self->get qw(-class -collections -keys -transients);
+    $self->get(qw(-class -collections -keys -transients));
   confess "Not valid to specify -keys when -collections is HASH"
     if $args->keys && ref $args->collections eq 'HASH';
   confess "Not valid to specify -transients without -class" 

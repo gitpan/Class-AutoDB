@@ -43,7 +43,7 @@ map {$ok&&=ok_objcache($_,'Oid','Mechanics',"object starts as Oid",
 report_pass($ok,"objects start as Oids - sanity test");
 
 # main tests
-for my $op qw(<=> < <= == >= > !=) {
+for my $op (qw(<=> < <= == >= > !=)) {
   my($object0,$object1)=splice(@matrix,0,2);
   eval "\$object0 $op \$object1"; # should not thaw
   my $ok=ok_objcache($object0,'Oid','Mechanics',"object0 not thawed",

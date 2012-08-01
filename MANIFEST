@@ -506,3 +506,4 @@ t/lib.pm
 t/README
 t/tap.pm
 t/xperiment/bar.pl
+META.json

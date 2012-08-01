@@ -1,5 +1,11 @@
 Revision history for Class-AutoDB
 
+1.23    2012-08-02
+	Changed code and tests to correct deprecated use of qw(...) as parentheses
+	Changes to Build.PL
+	- added Module::Build to configure_requires
+        - added dist_version_from
+
 1.22	2011-01-07
 	Bug fixes
 	- when 'using' a class at runtime, schema changes were not happening;

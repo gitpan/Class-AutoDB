@@ -11,8 +11,8 @@ use PctAUTODB_Trans;
 my $autodb=new Class::AutoDB(database=>'test'); # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
-for my $class qw(PctAUTODB_Trans_String PctAUTODB_Trans_Array
-		 PctAUTODB_Trans_unset PctAUTODB_Trans_1) {
+for my $class (qw(PctAUTODB_Trans_String PctAUTODB_Trans_Array
+		 PctAUTODB_Trans_unset PctAUTODB_Trans_1)) {
   my @objects=$autodb->get(collection=>'Person',name=>$class);
   is(scalar(@objects),1,"$class got one object");
   my $object=$objects[0];

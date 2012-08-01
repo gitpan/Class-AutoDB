@@ -1,0 +1,152 @@
+{
+   "abstract" : "Almost automatic object persistence coexisting with human-engineered database",
+   "author" : [
+      "Nat Goodman <natg@shore.net>"
+   ],
+   "dynamic_config" : 1,
+   "generated_by" : "Module::Build version 0.4, CPAN::Meta::Converter version 2.112150",
+   "license" : [
+      "perl_5"
+   ],
+   "meta-spec" : {
+      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
+      "version" : "2"
+   },
+   "name" : "Class-AutoDB",
+   "prereqs" : {
+      "build" : {
+         "requires" : {
+            "Carp" : 0,
+            "Class::AutoClass" : "1.53",
+            "Config" : 0,
+            "Cwd" : "3.26",
+            "DBD::mysql" : "4.007",
+            "DBI" : "1.604",
+            "Data::Rmap" : "0.61",
+            "Exporter" : "5.58",
+            "ExtUtils::CBuilder" : "0.22",
+            "File::Basename" : 0,
+            "File::Spec" : "3.26",
+            "File::Spec::Functions" : "3.26",
+            "FindBin" : 0,
+            "Getopt::Long" : "2.13",
+            "Hash::AutoHash::Args" : "1.11",
+            "List::MoreUtils" : "0.09",
+            "List::Util" : "1.14",
+            "SDBM_File" : 0,
+            "Scalar::Util" : "1.01",
+            "Storable" : "2.16",
+            "TAP::Harness" : "3.12",
+            "Test::Deep" : "0.098",
+            "Test::More" : "0.88"
+         }
+      },
+      "configure" : {
+         "requires" : {
+            "Cwd" : "3.26",
+            "DBI" : "1.604",
+            "File::Spec" : "3.26",
+            "Module::Build" : "0.4",
+            "SDBM_File" : 0
+         }
+      },
+      "runtime" : {
+         "requires" : {
+            "Carp" : 0,
+            "Class::AutoClass" : "1.54",
+            "Class::Singleton" : "1.04",
+            "DBI" : "1.604",
+            "Hash::AutoHash::Args" : "1.11",
+            "Scalar::Util" : "1.01",
+            "Storable" : "2.16",
+            "Text::Abbrev" : "1.01",
+            "Tie::ToObject" : "0.03"
+         }
+      }
+   },
+   "provides" : {
+      "Class::AutoDB" : {
+         "file" : "lib/Class/AutoDB.pm",
+         "version" : "1.23"
+      },
+      "Class::AutoDB::BaseTable" : {
+         "file" : "lib/Class/AutoDB/BaseTable.pm",
+         "version" : 0
+      },
+      "Class::AutoDB::Collection" : {
+         "file" : "lib/Class/AutoDB/Collection.pm",
+         "version" : 0
+      },
+      "Class::AutoDB::CollectionDiff" : {
+         "file" : "lib/Class/AutoDB/CollectionDiff.pm",
+         "version" : 0
+      },
+      "Class::AutoDB::Connect" : {
+         "file" : "lib/Class/AutoDB/Connect.pm",
+         "version" : 0
+      },
+      "Class::AutoDB::Cursor" : {
+         "file" : "lib/Class/AutoDB/Cursor.pm",
+         "version" : 0
+      },
+      "Class::AutoDB::Database" : {
+         "file" : "lib/Class/AutoDB/Database.pm",
+         "version" : 0
+      },
+      "Class::AutoDB::Dumper" : {
+         "file" : "lib/Class/AutoDB/Dumper.pm",
+         "version" : 0
+      },
+      "Class::AutoDB::Globals" : {
+         "file" : "lib/Class/AutoDB/Globals.pm",
+         "version" : 0
+      },
+      "Class::AutoDB::ListTable" : {
+         "file" : "lib/Class/AutoDB/ListTable.pm",
+         "version" : 0
+      },
+      "Class::AutoDB::Object" : {
+         "file" : "lib/Class/AutoDB/Object.pm",
+         "version" : 0
+      },
+      "Class::AutoDB::Oid" : {
+         "file" : "lib/Class/AutoDB/Oid.pm",
+         "version" : 0
+      },
+      "Class::AutoDB::OidDeleted" : {
+         "file" : "lib/Class/AutoDB/OidDeleted.pm",
+         "version" : 0
+      },
+      "Class::AutoDB::Registration" : {
+         "file" : "lib/Class/AutoDB/Registration.pm",
+         "version" : 0
+      },
+      "Class::AutoDB::Registry" : {
+         "file" : "lib/Class/AutoDB/Registry.pm",
+         "version" : 0
+      },
+      "Class::AutoDB::RegistryDiff" : {
+         "file" : "lib/Class/AutoDB/RegistryDiff.pm",
+         "version" : 0
+      },
+      "Class::AutoDB::RegistryVersion" : {
+         "file" : "lib/Class/AutoDB/RegistryVersion.pm",
+         "version" : 0
+      },
+      "Class::AutoDB::Serialize" : {
+         "file" : "lib/Class/AutoDB/Serialize.pm",
+         "version" : 0
+      },
+      "Class::AutoDB::Table" : {
+         "file" : "lib/Class/AutoDB/Table.pm",
+         "version" : 0
+      }
+   },
+   "release_status" : "stable",
+   "resources" : {
+      "license" : [
+         "http://dev.perl.org/licenses/"
+      ]
+   },
+   "version" : "1.23"
+}

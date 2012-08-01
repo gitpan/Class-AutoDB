@@ -54,7 +54,7 @@ my $bool=$object? 1: 0;	# force thaw
 ok_objcache($object,'OidDeleted','Mechanics',"thawed bool into OidDeleted");
 
 # test the rest
-for my $op qw(cmp lt le eq ge gt ne) {
+for my $op (qw(cmp lt le eq ge gt ne)) {
   my($object0,$object1)=splice(@matrix,0,2);
   eval "\$object0 $op \$object1"; # force thaw
 

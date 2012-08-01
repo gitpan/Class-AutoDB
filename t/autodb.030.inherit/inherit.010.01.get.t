@@ -56,7 +56,7 @@ my @all_correct_objects=
 my %c2word=(c=>'chain',t=>'trio',d=>'diamond',r=>'ragged');
 
 for my $class 
-  qw(c1 c2 c3 t10 t11 t2 t3 d1 d20 d21 d3 d4 d50 d51 d6 d7 r1 r20 r21 r22 r30 r31 r32 r4 r5) {
+  (qw(c1 c2 c3 t10 t11 t2 t3 d1 d20 d21 d3 d4 d50 d51 d6 d7 r1 r20 r21 r22 r30 r31 r32 r4 r5)) {
     do_test($class);
   }
 

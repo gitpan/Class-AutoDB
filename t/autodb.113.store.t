@@ -37,12 +37,12 @@ my $objstrs=dbh->selectcol_arrayref(qq(SELECT object FROM _AutoDB WHERE oid=$oid
 is(scalar(@$objstrs),1,'count is 1'); # expect 1 result, but make sure!
 my $objstr=$objstrs->[0];
 # test non-transients. all should be in $objstr
-for my $key qw(name id sex) {
+for my $key (qw(name id sex)) {
   my $pat=qr/\b$key\b\W*=>/;	# eg, 'name' => ...
   like($objstr,$pat,"$key found in object");
 }
 # test transients. none should be in $objstr
-for my $key qw(name_prefix sex_word) {
+for my $key (qw(name_prefix sex_word)) {
   my $pat=qr/\b$key\b\W*=>/;	# eg, 'name' => ...
   unlike($objstr,$pat,"$key not found in object");
 }
