@@ -22,6 +22,12 @@ use base qw(Class::AutoDB::Oid);
 #   $self->AUTOLOAD(@_);
 # }
 
+# NG 12-10-28: UNIVERSAL methods confess. do it via AUTOLOAD
+sub isa {$AUTOLOAD='isa'; shift->AUTOLOAD(@_)}
+sub can {$AUTOLOAD='can'; shift->AUTOLOAD(@_)}
+sub DOES {$AUTOLOAD='DOES'; shift->AUTOLOAD(@_)}
+sub VERSION {$AUTOLOAD='VERSION'; shift->AUTOLOAD(@_)}
+
 # AUTOLOAD always confesses, since it is impossible to access deleted object
 use vars qw($AUTOLOAD);
 sub AUTOLOAD {

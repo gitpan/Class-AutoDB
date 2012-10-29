@@ -42,6 +42,12 @@ sub put {
   # return $obj->put(@_);
 }
 
+# NG 12-10-28: redispatch UNIVERSAL methods to Oid's class
+sub isa {shift->{_CLASS}->isa(@_)}
+sub can {shift->{_CLASS}->can(@_)}
+sub DOES {shift->{_CLASS}->DOES(@_)}
+sub VERSION {shift->{_CLASS}->VERSION(@_)}
+
 # NG 10-09-09: decided to remove is_extant, is_deleted, del to avoid polluting namespace further
 # # NG 10-08-27: part of support for deleted objects
 # #              have to fetch object since that's the only way to know whether it's deleted.

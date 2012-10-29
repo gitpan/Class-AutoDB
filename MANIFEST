@@ -32,6 +32,7 @@ lib/Class/AutoDB/Serialize.pm
 lib/Class/AutoDB/Table.pm
 Makefile.PL
 MANIFEST			This list of files
+META.json
 META.yml
 README
 t/autodb.000.code_exists.t
@@ -406,10 +407,13 @@ t/autodb.130.runtime_use/RunTimeUseBad.pm
 t/autodb.130.runtime_use/RunTimeUseCollection.pm
 t/autodb.130.runtime_use/RunTimeUseOk.pm
 t/autodb.131.namespace.t.not-used
+t/autodb.132.00.universal.t
+t/autodb.132.01.universal.t
 t/autodb.150.dropview.t
 t/autodb_118.pm
 t/autodb_119.pm
 t/autodb_121.pm
+t/autodb_132.pm
 t/autodbRunTests.pm
 t/autodbTestObject.pm
 t/autodbUtil.pm
@@ -506,4 +510,3 @@ t/lib.pm
 t/README
 t/tap.pm
 t/xperiment/bar.pl
-META.json

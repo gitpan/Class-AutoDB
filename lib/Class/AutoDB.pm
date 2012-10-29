@@ -10,7 +10,7 @@ use Class::AutoDB::Connect;
 use Class::AutoDB::Database;
 use Class::AutoDB::Registry;
 use Class::AutoDB::RegistryDiff;
-our $VERSION = '1.23';
+our $VERSION = '1.24';
 $VERSION=eval $VERSION;		# I think this is the accepted idiom..
 
 # NG 09-11-24: move Database first so AutoClass::get will not mask Database::get
@@ -240,7 +240,7 @@ Class::AutoDB - Almost automatic object persistence coexisting with human-engine
 
 =head1 VERSION
 
-Version 1.22
+Version 1.24
 
 =head1 SYNOPSIS
 
@@ -833,6 +833,21 @@ changes its BLOB in the object column of the _AutoDB table to NULL. We
 leave the object's oid in the _AutoDB table to allow better error
 handling on subsequent attempts to access the object.  See L<"Object
 deletion details"> for further discussion.
+
+=head3 UNIVERSAL methods
+
+UNIVERSAL, the base class of everything, defines four methods: isa,
+DOES, can, and VERSION.  Logically these are class methods, because
+they return the same answer for all objects of a given class.  In
+practice, programmers frequently invoke these on objects.
+
+When invoked on an oid, the system intercepts the call and
+redispatches the method to the oid's real class.  The system does not
+retrieve the object from the database.
+
+When invoked on a deleted-oid, the system intercepts the call and
+generates an error to be consistent with how all other method
+invocations are handled.  See L<"Object deletion details">.
 
 =head3 Data::Dumper details
 

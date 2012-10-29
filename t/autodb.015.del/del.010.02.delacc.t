@@ -35,7 +35,7 @@ $test->test_del
     (labelprefix=>"del objects:",objects=>\@objects);
 
 # now do the real tests. 
-# application methods should confess. 'oid' should work. 'put' is nop
+# application & UNIVERSAL methods should confess. 'oid' should work. 'put' is nop
 for (my $i=0; $i<@objects; $i++) {
   my $case=($first_case+$i)%@objects; 
   my $obj=$objects[$case];
@@ -57,6 +57,24 @@ for (my $i=0; $i<@objects; $i++) {
     ($obj,$oid,'OidDeleted',$class,
      'application method (id) did not fetch object',__FILE__,__LINE__,'no_report_pass');
   report_pass($ok,"$labelprefix: application method");
+  # NG 12-10-28: test UNIVERSAL methods: isa, can, DOES, VERSION
+  my $ok=1;
+  for my $method (qw(isa can DOES VERSION)) {
+    my $actual=eval {$obj->$method;};
+    if ($@) {
+      $ok&&=report_fail
+	(scalar $@=~/Trying to access deleted object of class \S+ via method $method \(oid=$oid\)/,
+	 "UNIVERSAL method ($method) confessed but with wrong message: $@",__FILE__,__LINE__);
+    } else {
+      $ok&&=report_fail
+	(0,"UNIVERSAL method was supposed to confess but did not",__FILE__,__LINE__);
+    }
+    $ok&&=ok_objcache
+      ($obj,$oid,'OidDeleted',$class,
+       'UNIVERSAL method ($method) did not fetch object',__FILE__,__LINE__,'no_report_pass');
+  }
+  report_pass($ok,"$labelprefix: application method");
+
   # test 'oid' method
   my $ok=1;
   my $actual=eval{$obj->oid;};

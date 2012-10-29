@@ -1,5 +1,12 @@
 Revision history for Class-AutoDB
 
+1.24	2012-MM-DD
+	Added test for version number in POD
+	Removed redundant 'dist_version_from' param from Build.PL
+	Bug fixes
+	- when invoking a UNIVERSAL method (isa, can, DOES, VERSION) on Oid or
+	  OidDelelted, the method was not redispatched to the real class
+
 1.23    2012-08-02
 	Changed code and tests to correct deprecated use of qw(...) as parentheses
 	Changes to Build.PL

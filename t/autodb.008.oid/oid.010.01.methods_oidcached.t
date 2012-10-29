@@ -39,6 +39,24 @@ report_fail($@ eq '',$@,__FILE__,__LINE__);
 is($actual,$oid,'oid method returned correct value');
 ok_objcache($obj,$oid,'Oid','Persistent','oid method did not fetch object',__FILE__,__LINE__);
 
+# NG 12-10-28: test UNIVERSAL methods: isa, can, DOES, VERSION
+my $actual=eval{$obj->isa('Persistent');};
+report_fail($@ eq '',$@,__FILE__,__LINE__);
+ok($actual,'isa method returned correct value');
+ok_objcache($obj,$oid,'Oid','Persistent','isa method did not fetch object',__FILE__,__LINE__);
+my $actual=eval{$obj->can('name');};
+report_fail($@ eq '',$@,__FILE__,__LINE__);
+ok($actual,'can method returned correct value');
+ok_objcache($obj,$oid,'Oid','Persistent','can method did not fetch object',__FILE__,__LINE__);
+my $actual=eval{$obj->DOES('Persistent');};
+report_fail($@ eq '',$@,__FILE__,__LINE__);
+ok($actual,'DOES method returned correct value');
+ok_objcache($obj,$oid,'Oid','Persistent','DOES method did not fetch object',__FILE__,__LINE__);
+my $actual=eval{$obj->VERSION;};
+report_fail($@ eq '',$@,__FILE__,__LINE__);
+is($actual,$Persistent::VERSION,'VERSION method returned correct value');
+ok_objcache($obj,$oid,'Oid','Persistent','VERSION method did not fetch object',__FILE__,__LINE__);
+
 # $i++; my $obj=$objs[$i]; my $oid=$oids[$i];
 # my $actual=eval{$obj->is_extant;};
 # report_fail($@ eq '',$@,__FILE__,__LINE__);

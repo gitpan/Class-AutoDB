@@ -19,7 +19,6 @@ my $builder = $class->new
   (module_name         => 'Class::AutoDB',
    license             => 'perl',
    dist_author         => q{Nat Goodman <natg@shore.net>},
-   dist_version_from   => 'lib/Class/AutoDB.pm',
    configure_requires=>{'Cwd' => 3.26,
 			# 'DBD::mysql' => 4.007,
 			'DBI' => 1.604,
