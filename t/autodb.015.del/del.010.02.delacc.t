@@ -59,7 +59,8 @@ for (my $i=0; $i<@objects; $i++) {
   report_pass($ok,"$labelprefix: application method");
   # NG 12-10-28: test UNIVERSAL methods: isa, can, DOES, VERSION
   my $ok=1;
-  for my $method (qw(isa can DOES VERSION)) {
+  my @methods=(qw(isa can VERSION),($^V<5.10.1? (): 'DOES'));
+  for my $method (@methods) {
     my $actual=eval {$obj->$method;};
     if ($@) {
       $ok&&=report_fail

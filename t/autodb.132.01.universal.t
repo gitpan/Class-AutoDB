@@ -16,7 +16,7 @@ my $autodb=new Class::AutoDB(-database=>'test');
 my($joe)=$autodb->get(-collection=>'Person',-name=>'Joe');
 ok($joe->isa('Person'),'real object: isa');
 ok($joe->can('eat'),'real object: can');
-ok($joe->DOES('Person'),'real object: DOES');
+ok($joe->DOES('Person'),'real object: DOES') unless $^V<5.10.1;
 is($joe->VERSION,$Person::VERSION,'real object: VERSION');
 
 # do it for Oid. all should work
@@ -24,7 +24,7 @@ my $mary=$joe->friends->[0];
 is(ref $mary,'Class::AutoDB::Oid','object is Oid - sanity check');
 ok($mary->isa('Person'),'Oid: isa');
 ok($mary->can('eat'),'Oid: can');
-ok($mary->DOES('Person'),'Oid: DOES');
+ok($mary->DOES('Person'),'Oid: DOES') unless $^V<5.10.1;
 is($mary->VERSION,$Person::VERSION,'Oid: VERSION');
 is(ref $mary,'Class::AutoDB::Oid','Oid not fetched');
 
@@ -33,7 +33,7 @@ $autodb->del($mary);
 is(ref $mary,'Class::AutoDB::OidDeleted','object is OidDeleted - sanity check');
 test_del($mary,'isa',__FILE__,__LINE__);
 test_del($mary,'can',__FILE__,__LINE__);
-test_del($mary,'DOES',__FILE__,__LINE__);
+test_del($mary,'DOES',__FILE__,__LINE__) unless $^V<5.10.1;
 test_del($mary,'VERSION',__FILE__,__LINE__);
 is(ref $mary,'Class::AutoDB::OidDeleted','OidDeleted not fetched');
 

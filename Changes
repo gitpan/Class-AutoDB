@@ -1,6 +1,11 @@
 Revision history for Class-AutoDB
 
-1.24	2012-MM-DD
+1.25	2012-11-28
+	Changes to tests
+	- tests of DOES method check for Perl version >= 5.10.1. thanks to the
+	  CPAN smoke testers for finding this problem! 
+
+1.24	2012-10-28
 	Added test for version number in POD
 	Removed redundant 'dist_version_from' param from Build.PL
 	Bug fixes

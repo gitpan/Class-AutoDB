@@ -42,7 +42,7 @@ name: Class-AutoDB
 provides:
   Class::AutoDB:
     file: lib/Class/AutoDB.pm
-    version: 1.24
+    version: 1.25
   Class::AutoDB::BaseTable:
     file: lib/Class/AutoDB/BaseTable.pm
     version: 0
@@ -109,4 +109,4 @@ requires:
   Tie::ToObject: 0.03
 resources:
   license: http://dev.perl.org/licenses/
-version: 1.24
+version: 1.25
