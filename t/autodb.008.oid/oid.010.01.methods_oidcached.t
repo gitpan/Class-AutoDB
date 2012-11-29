@@ -40,6 +40,12 @@ is($actual,$oid,'oid method returned correct value');
 ok_objcache($obj,$oid,'Oid','Persistent','oid method did not fetch object',__FILE__,__LINE__);
 
 # NG 12-10-28: test UNIVERSAL methods: isa, can, DOES, VERSION
+# NG 12-11-29: only test DOES in perls > 5.10. 
+# Note: $^V returns real string in perls > 5.10, and v-string in earlier perls
+#   regexp below fails in earlier perls. this is okay
+my($perl_main,$perl_minor)=$^V=~/^v(\d+)\.(\d+)/; # perl version
+my $does_ok=($perl_main>=5 && $perl_minor>=10);
+
 my $actual=eval{$obj->isa('Persistent');};
 report_fail($@ eq '',$@,__FILE__,__LINE__);
 ok($actual,'isa method returned correct value');
@@ -48,7 +54,7 @@ my $actual=eval{$obj->can('name');};
 report_fail($@ eq '',$@,__FILE__,__LINE__);
 ok($actual,'can method returned correct value');
 ok_objcache($obj,$oid,'Oid','Persistent','can method did not fetch object',__FILE__,__LINE__);
-unless ($^V<5.10.1) {
+if ($does_ok) {
   my $actual=eval{$obj->DOES('Persistent');};
   report_fail($@ eq '',$@,__FILE__,__LINE__);
   ok($actual,'DOES method returned correct value');

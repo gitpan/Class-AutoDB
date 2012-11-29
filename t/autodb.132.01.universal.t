@@ -12,11 +12,18 @@ use autodbUtil;
 use autodb_132;
 
 my $autodb=new Class::AutoDB(-database=>'test');
+
+# NG 12-11-29: only test DOES in perls > 5.10. 
+# Note: $^V returns real string in perls > 5.10, and v-string in earlier perls
+#   regexp below fails in earlier perls. this is okay
+my($perl_main,$perl_minor)=$^V=~/^v(\d+)\.(\d+)/; # perl version
+my $does_ok=($perl_main>=5 && $perl_minor>=10);
+
 # retrieve and check one Person
 my($joe)=$autodb->get(-collection=>'Person',-name=>'Joe');
 ok($joe->isa('Person'),'real object: isa');
 ok($joe->can('eat'),'real object: can');
-ok($joe->DOES('Person'),'real object: DOES') unless $^V<5.10.1;
+ok($joe->DOES('Person'),'real object: DOES') if $does_ok;
 is($joe->VERSION,$Person::VERSION,'real object: VERSION');
 
 # do it for Oid. all should work
@@ -24,7 +31,7 @@ my $mary=$joe->friends->[0];
 is(ref $mary,'Class::AutoDB::Oid','object is Oid - sanity check');
 ok($mary->isa('Person'),'Oid: isa');
 ok($mary->can('eat'),'Oid: can');
-ok($mary->DOES('Person'),'Oid: DOES') unless $^V<5.10.1;
+ok($mary->DOES('Person'),'Oid: DOES') if $does_ok;
 is($mary->VERSION,$Person::VERSION,'Oid: VERSION');
 is(ref $mary,'Class::AutoDB::Oid','Oid not fetched');
 
@@ -33,7 +40,7 @@ $autodb->del($mary);
 is(ref $mary,'Class::AutoDB::OidDeleted','object is OidDeleted - sanity check');
 test_del($mary,'isa',__FILE__,__LINE__);
 test_del($mary,'can',__FILE__,__LINE__);
-test_del($mary,'DOES',__FILE__,__LINE__) unless $^V<5.10.1;
+test_del($mary,'DOES',__FILE__,__LINE__) if $does_ok;
 test_del($mary,'VERSION',__FILE__,__LINE__);
 is(ref $mary,'Class::AutoDB::OidDeleted','OidDeleted not fetched');
 

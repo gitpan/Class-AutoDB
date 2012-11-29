@@ -58,8 +58,14 @@ for (my $i=0; $i<@objects; $i++) {
      'application method (id) did not fetch object',__FILE__,__LINE__,'no_report_pass');
   report_pass($ok,"$labelprefix: application method");
   # NG 12-10-28: test UNIVERSAL methods: isa, can, DOES, VERSION
+  # NG 12-11-29: only test DOES in perls > 5.10. 
+  # Note: $^V returns real string in perls > 5.10, and v-string in earlier perls
+  #   regexp below fails in earlier perls. this is okay
+  my($perl_main,$perl_minor)=$^V=~/^v(\d+)\.(\d+)/; # perl version
+  my $does_ok=($perl_main>=5 && $perl_minor>=10);
+  
   my $ok=1;
-  my @methods=(qw(isa can VERSION),($^V<5.10.1? (): 'DOES'));
+  my @methods=(qw(isa can VERSION),($does_ok? (): 'DOES'));
   for my $method (@methods) {
     my $actual=eval {$obj->$method;};
     if ($@) {

@@ -1,9 +1,17 @@
 Revision history for Class-AutoDB
 
+1.26	201Y-11-29
+	Changes to tests
+	- fixed the change made in 1.25.  $^V, the variable containing Perl's
+	  version, works differently in different versions. in perls > 5.10 it
+	  returns a regular string, while in earlier versions it returns a 
+	  v-string. naturally, the code to handle these cases is different...
+
 1.25	2012-11-28
 	Changes to tests
-	- tests of DOES method check for Perl version >= 5.10.1. thanks to the
-	  CPAN smoke testers for finding this problem! 
+	- tests of DOES method now check for Perl version >= 5.10.1, since that
+	  is when DOES was added to UNIVERSAL. thanks to the CPAN smoke testers
+	  for finding this problem! 
 
 1.24	2012-10-28
 	Added test for version number in POD

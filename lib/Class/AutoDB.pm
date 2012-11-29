@@ -10,7 +10,7 @@ use Class::AutoDB::Connect;
 use Class::AutoDB::Database;
 use Class::AutoDB::Registry;
 use Class::AutoDB::RegistryDiff;
-our $VERSION = '1.25';
+our $VERSION = '1.26';
 $VERSION=eval $VERSION;		# I think this is the accepted idiom..
 
 # NG 09-11-24: move Database first so AutoClass::get will not mask Database::get
@@ -240,7 +240,7 @@ Class::AutoDB - Almost automatic object persistence coexisting with human-engine
 
 =head1 VERSION
 
-Version 1.25
+Version 1.26
 
 =head1 SYNOPSIS
 
