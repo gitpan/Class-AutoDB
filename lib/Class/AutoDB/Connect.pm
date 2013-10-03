@@ -3,6 +3,7 @@ use vars qw(@ISA @AUTO_ATTRIBUTES @OTHER_ATTRIBUTES %SYNONYMS %DEFAULTS);
 use strict;
 use DBI;
 use Class::AutoClass;
+use File::Spec;
 use Hash::AutoHash::Args;
 use Class::AutoDB::Serialize;
 @ISA = qw(Class::AutoClass);
@@ -85,7 +86,12 @@ sub _connect {
     my $port=$self->port;
     my @props=("database=$database","host=$host");
     push(@props,"port=$port") if defined $port;
-    push(@props,"sock=$sock") if defined $sock;
+    # NG 13-07-28: using wrong prop! should be mysql_socket
+    # push(@props,"sock=$sock") if defined $sock;
+    if (defined $sock) {
+      $sock=File::Spec->rel2abs($sock);
+      push(@props,"mysql_socket=$sock");
+    }
     my $props=join(';',@props);
     $dsn="DBI:$dbd:$props";
   }

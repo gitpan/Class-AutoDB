@@ -1,6 +1,22 @@
 Revision history for Class-AutoDB
 
-1.26	201Y-11-29
+1.27_02	2013-09-29
+	No functional changes
+	Updated depdendencies
+        Fixed boilerplate & pod tests
+	Added 000.reqs test to check existence MySQL database, adapted from Babel
+        Removed Developer tests from distro.  Haven't been tested in a while!
+
+1.27_01	2013-07-28
+	Bug fixes
+	- connect was using the wrong property name when setting 'socket' in
+	  dsn. was using 'sock'; should be 'mysql_socket'
+	Changes to tests
+	 - regression test for socket bug
+	 - updated 002.pod to strip development sub-version number
+	 - imported 003.manifest from Babel
+
+1.26	2012-11-29
 	Changes to tests
 	- fixed the change made in 1.25.  $^V, the variable containing Perl's
 	  version, works differently in different versions. in perls > 5.10 it

@@ -44,7 +44,7 @@ our @EXPORT=qw(group groupmap gentle_uniq
 	       remember_oids
 	       test_single 
 	       actual_tables actual_counts norm_counts actual_columns
-	       report report_pass report_fail
+	       report report_pass report_fail called_from
 	     );
 # TODO: database name should be configurable
 # CAUTION: $test_db and $SDBM_dir duplicated in Build.PL
@@ -646,6 +646,7 @@ sub report {
   my($ok,$label,$file,$line,$details)=@_;
   pass($label), return if $ok;
   fail($label);
+  ($file,$line)=called_from($file,$line);
   diag("from $file line $line") if defined $file;
   if (defined $details) {
     diag(deep_diag($details)) if ref $details;
@@ -663,11 +664,22 @@ sub report_fail {
   my($ok,$label,$file,$line,$details)=@_;
   return 1 if $ok;
   fail($label);
+  ($file,$line)=called_from($file,$line);
   diag("from $file line $line") if defined $file;
   if (defined $details) {
     diag(deep_diag($details)) if ref $details;
     diag($details) unless ref $details;
   }
   return 0;
+}
+# set $file,$line if not already set
+sub called_from {
+  return @_ if $_[0];
+  my($package,$file,$line);
+  my $i=0;
+  while (($package,$file,$line)=caller($i++)) {
+    last if 'main' eq $package;
+  }
+  ($file,$line);
 }
 1;

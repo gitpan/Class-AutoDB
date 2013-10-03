@@ -35,15 +35,24 @@ sub run_tap_harness {
     my $test=$tests->[$i];
     my $testargs;
     my($base,$dir,$sfx)=fileparse($test,'.t');
+    # assume simple test
+    $harness->verbosity(0);
     my $possible_dir=File::Spec->catdir($dir,$base);
-    if (-d $possible_dir) {	# directory exists so it's a compound test
-      $harness->verbosity(1);
-      $testargs=" --basenum=$testnum";
-    } else {			# simple test
-      $harness->verbosity(0);
-    }
+    if (-d $possible_dir) {	# directory exists see if it has any .t files
+      opendir(DIR,$possible_dir) || die "Cannot open directory $possible_dir: $!";
+      if (grep /^[^.].*\.t$/,readdir DIR) {
+	# it's a compound test
+	$harness->verbosity(1);
+	$testargs=" --basenum=$testnum";
+      }}
     $harness->aggregate_tests($agg,[$test.$testargs,"$testnum $test"]);
     # push(@testfiles,[$test.$testargs,"$testnum $test"]);
+    # NG 13-07-27: handle 'pragma +stop_testing'
+    #              used at present to signal that MySQL not available
+    my @parsers=$agg->parsers;
+    my $parser=$parsers[$#parsers];
+    my @pragmas=$parser->pragmas;
+    last if grep /stop_testing/i,@pragmas;
   }
   # $harness->runtests(@testfiles);
   $agg->stop();
