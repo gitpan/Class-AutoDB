@@ -1,20 +1,18 @@
 Revision history for Class-AutoDB
 
-1.27_02	2013-09-29
-	No functional changes
-	Updated depdendencies
-        Fixed boilerplate & pod tests
-	Added 000.reqs test to check existence MySQL database, adapted from Babel
-        Removed Developer tests from distro.  Haven't been tested in a while!
-
-1.27_01	2013-07-28
+1.27	2013-10-05
 	Bug fixes
 	- connect was using the wrong property name when setting 'socket' in
 	  dsn. was using 'sock'; should be 'mysql_socket'
+	Updated depdendencies
 	Changes to tests
 	 - regression test for socket bug
 	 - updated 002.pod to strip development sub-version number
 	 - imported 003.manifest from Babel
+         - fixed boilerplate & pod tests
+	 - added 000.reqs test to check existence of MySQL database, adapted 
+	   from Babel
+         - removed Developer tests from distro. Haven't been tested in a while!
 
 1.26	2012-11-29
 	Changes to tests
