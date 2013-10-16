@@ -1,5 +1,10 @@
 Revision history for Class-AutoDB
 
+1.28_01	2013-10-16
+	Fixed problem with manifest
+	David Cantrell is seeing strange FAILs. Hope this is somehow due to 
+	problem with manifest...
+
 1.27	2013-10-05
 	Bug fixes
 	- connect was using the wrong property name when setting 'socket' in
