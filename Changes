@@ -1,7 +1,12 @@
 Revision history for Class-AutoDB
 
+1.28_02	2013-10-17
+	Still trying to fix problem with manifest. 
+	- current theory is problem with old version of Test::CheckManifest
+	- added dependency
+
 1.28_01	2013-10-16
-	Fixed problem with manifest
+	Tried to fix problem with manifest
 	David Cantrell is seeing strange FAILs. Hope this is somehow due to 
 	problem with manifest...
 

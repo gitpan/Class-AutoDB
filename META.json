@@ -40,6 +40,7 @@
             "Storable" : "2.3",
             "TAP::Harness" : "3.28",
             "TAP::Parser::Aggregator" : "3.28",
+            "Test::CheckManifest" : "1.26",
             "Test::Deep" : "0.11",
             "Test::More" : "0.98",
             "Test::Pod" : "1.48",
@@ -78,7 +79,7 @@
    "provides" : {
       "Class::AutoDB" : {
          "file" : "lib/Class/AutoDB.pm",
-         "version" : "1.28_01"
+         "version" : "1.28_02"
       },
       "Class::AutoDB::BaseTable" : {
          "file" : "lib/Class/AutoDB/BaseTable.pm",
@@ -159,5 +160,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "1.28_01"
+   "version" : "1.28_02"
 }

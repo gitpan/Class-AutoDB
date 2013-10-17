@@ -39,6 +39,7 @@ my $builder = $class->new
 			'Storable' => 2.3,
 			'TAP::Harness' => 3.28,
 			'TAP::Parser::Aggregator' => 3.28,
+			'Test::CheckManifest' => 1.26,
 			'Test::Deep' => 0.11,
 			'Test::More' => 0.98,
 			'Test::Pod' => 1.48,
