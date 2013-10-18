@@ -1,5 +1,10 @@
 Revision history for Class-AutoDB
 
+1.28_03	2013-10-18
+	Still trying to fix problem with manifest. 
+	- current theory: I omitted MANIFEST.SKIP from MANIFEST because
+	  MANIFEST.SKIP says to skip it.  d'oh :)
+
 1.28_02	2013-10-17
 	Still trying to fix problem with manifest. 
 	- current theory is problem with old version of Test::CheckManifest
