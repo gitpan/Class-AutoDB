@@ -16,7 +16,6 @@ lib/Class/AutoDB/CollectionDiff.pm
 lib/Class/AutoDB/Connect.pm
 lib/Class/AutoDB/Cursor.pm
 lib/Class/AutoDB/Database.pm
-lib/Class/AutoDB/Dumper.c
 lib/Class/AutoDB/Dumper.pm
 lib/Class/AutoDB/Dumper.xs
 lib/Class/AutoDB/Globals.pm

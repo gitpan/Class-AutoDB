@@ -1,5 +1,10 @@
 Revision history for Class-AutoDB
 
+1.28_04	2013-10-18
+	Still trying to fix problem with manifest. 
+	- while removing MANIFEST.SKIP from MANIFEST.SKIP (so it would be added 
+	  to MANIFEST, I also stupidly removed Dumper.c
+
 1.28_03	2013-10-18
 	Still trying to fix problem with manifest. 
 	- current theory: I omitted MANIFEST.SKIP from MANIFEST because

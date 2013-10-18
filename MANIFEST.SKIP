@@ -27,6 +27,7 @@ foo
 Foo
 \.dir$
 \.pag$
+Dumper\.c$
 \.o$
 ^MYMETA\.yml$
 ^MYMETA\.json$
@@ -35,4 +36,4 @@ Foo
 ^t/SDBM
 ^t/MYSQL
 # ^MANIFEST\.SKIP$
-# Dumper\.c$
+
