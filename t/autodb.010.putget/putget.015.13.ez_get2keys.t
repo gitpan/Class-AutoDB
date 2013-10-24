@@ -1,7 +1,7 @@
 ########################################
 # retrieve objects w/ all types of keys stored by previous test
 # this set (10, 11, ...) test values that are easy to query
-# this one does queries with 1 key
+# this one does queries with 2 keys
 ########################################
 use t::lib;
 use strict;

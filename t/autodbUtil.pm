@@ -108,9 +108,10 @@ sub all_objects {values %{Class::AutoDB::Globals->instance()->oid2obj}}
 
 sub dbh {my $autodb=autodb; $autodb? $autodb->dbh: _dbh()}
 our $MYSQL_dbh;
+# NG 13-10-23: changed connect to use $ENV{USER} instead of undef. should be equivalent, but...
 sub _dbh {
   $MYSQL_dbh or $MYSQL_dbh=DBI->connect
-    ("dbi:mysql:database=$test_db",undef,undef,
+    ("dbi:mysql:database=$test_db",$ENV{USER},undef,
      {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,});
 }
 # hashes below are exported.

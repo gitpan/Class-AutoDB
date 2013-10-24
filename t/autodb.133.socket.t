@@ -4,6 +4,7 @@
 use t::lib;
 use Carp;
 use DBI;
+use File::Spec;
 use List::MoreUtils qw(all);
 use List::Util qw(first);
 use Test::Deep qw(cmp_details bag);
@@ -66,13 +67,27 @@ SKIP: {
   $mysqld->start;		# start mysqld
   # NG 13-09-04: actually, we want to stop the server else server processes accumulate...
   # $mysqld->pid(undef);		# HACK so DESTROY won't stop server
-  my $private_autodb=new Class::AutoDB(socket=>$socket_file,database=>'test',create=>1);
+  # NG 13-10-23: be more cautoius about how we connect to private instance
+  #              code adapted from 000.reqs
+  my $user=$ENV{USER};
+  my $sock=File::Spec->rel2abs($socket_file);
+  eval {$dbh=DBI->connect("dbi:mysql:mysql_socket=$sock",$user,undef,
+			  {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,})};
+  unless ($dbh) {
+    # try as root
+    $user='root';
+    eval {$dbh=DBI->connect("dbi:mysql:mysql_socket=$sock",$user,undef,
+			    {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,})};
+    goto QUIT unless $dbh;
+  }
+  # able to connect, so continue the test
+  my $private_autodb=new Class::AutoDB(socket=>$socket_file,user=>$user,database=>'test',create=>1);
   report_fail($private_autodb,'AutoDB created from socket on private MySQL instance') 
     or goto QUIT;
   # note('testing dbh from AutoDB created from socket on private MySQL instance');
   check_mysql($private_autodb->dbh) or goto QUIT;
   pass('dbh from AutoDB created from socket on private MySQL instance');
-
+  
   # now make sure the public and private instances are different
   # note('testing public and private MySQL instances are different');
   # create table in public instance

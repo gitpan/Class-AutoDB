@@ -1,5 +1,13 @@
 Revision history for Class-AutoDB
 
+1.28_05	2013-10-24
+	Working on FAILs seen by Cantrell
+	- current theory: some tests connect to MySQL using undef as the user
+	  instead of $ENV{USER}. These are usually equivalent but may not be
+	  if the DBI_USER environment variable is set
+	- made the socket test more cautious when connecting to a private MySQL
+	  instance. Tries to connect as user, then as root, then gives up 
+
 1.28_04	2013-10-18
 	Still trying to fix problem with manifest. 
 	- while removing MANIFEST.SKIP from MANIFEST.SKIP (so it would be added 

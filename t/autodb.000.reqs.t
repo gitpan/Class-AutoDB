@@ -70,9 +70,10 @@ DIAG
 sub check_mysql {
   my($test_db)=@_;
   # make sure we can talk to MySQL
+  # NG 13-10-23: changed connect to use $ENV{USER} instead of undef. should be equivalent, but...
   my($dbh,$errstr);
   eval
-    {$dbh=DBI->connect("dbi:mysql:",undef,undef,
+    {$dbh=DBI->connect("dbi:mysql:",$ENV{USER},undef,
 		       {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,})};
   $errstr=$@, goto FAIL if $@;
   goto FAIL unless $dbh;
