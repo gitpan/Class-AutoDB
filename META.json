@@ -79,7 +79,7 @@
    "provides" : {
       "Class::AutoDB" : {
          "file" : "lib/Class/AutoDB.pm",
-         "version" : "1.28_05"
+         "version" : "1.28"
       },
       "Class::AutoDB::BaseTable" : {
          "file" : "lib/Class/AutoDB/BaseTable.pm",
@@ -154,11 +154,11 @@
          "version" : 0
       }
    },
-   "release_status" : "testing",
+   "release_status" : "stable",
    "resources" : {
       "license" : [
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "1.28_05"
+   "version" : "1.28"
 }

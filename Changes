@@ -1,32 +1,16 @@
 Revision history for Class-AutoDB
 
-1.28_05	2013-10-24
-	Working on FAILs seen by Cantrell
-	- current theory: some tests connect to MySQL using undef as the user
-	  instead of $ENV{USER}. These are usually equivalent but may not be
-	  if the DBI_USER environment variable is set
+1.28	2013-10-28
+	Fixed problems with manifest introduced in 1.27. Added dependency for
+	Test::CheckManifest
+	Unable to reproduce FAILs seen by David Cantrell.
+	Changes to tests
+	- streamlined manifest test
 	- made the socket test more cautious when connecting to a private MySQL
 	  instance. Tries to connect as user, then as root, then gives up 
-
-1.28_04	2013-10-18
-	Still trying to fix problem with manifest. 
-	- while removing MANIFEST.SKIP from MANIFEST.SKIP (so it would be added 
-	  to MANIFEST, I also stupidly removed Dumper.c
-
-1.28_03	2013-10-18
-	Still trying to fix problem with manifest. 
-	- current theory: I omitted MANIFEST.SKIP from MANIFEST because
-	  MANIFEST.SKIP says to skip it.  d'oh :)
-
-1.28_02	2013-10-17
-	Still trying to fix problem with manifest. 
-	- current theory is problem with old version of Test::CheckManifest
-	- added dependency
-
-1.28_01	2013-10-16
-	Tried to fix problem with manifest
-	David Cantrell is seeing strange FAILs. Hope this is somehow due to 
-	problem with manifest...
+	- some tests were connecting to MySQL using undef as the user instead of
+	  $ENV{USER}. These are usually equivalent but may not be if the 
+	  DBI_USER environment variable is set
 
 1.27	2013-10-05
 	Bug fixes
