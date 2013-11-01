@@ -34,7 +34,7 @@ sub do_sql {
 ok(1,'start');			# ensure that at least 1 test runs
 # NG 10-09-17: only run if MySQL version >= 5.0.1, since views not supported before then
 # NG 10-09-18: skip if create view fails for any reason. report reason
-my $dbh=DBI->connect("dbi:mysql:database=test",undef,undef,
+my $dbh=DBI->connect("dbi:mysql:database=".testdb,undef,undef,
                      {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,});
 report_fail(!$DBI::err,"connecting to MySQL: $DBI::errstr",__FILE__,__LINE__);
 
@@ -84,13 +84,13 @@ unless ($ok) {
     } else {
       # regression test starts here
       # create AutoDB
-      my $autodb=eval {new Class::AutoDB(database=>'test',create=>1);};
+      my $autodb=eval {new Class::AutoDB(database=>testdb,create=>1);};
       my $ok=report_fail(!$@,"create AutoDB\n$@");
       if ($ok) {    # only continue if AutoDB exists. futile otherwise
 	isa_ok($autodb,'Class::AutoDB','create AutoDB');
 	
 	# re-open $autodb in alter mode
-	my $autodb=new Class::AutoDB(database=>'test',alter=>1);
+	my $autodb=new Class::AutoDB(database=>testdb,alter=>1);
 	isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 	# create
 	eval {$autodb->register(class=>'Test',collection=>'Test',keys=>qq(name string));};

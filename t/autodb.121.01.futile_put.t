@@ -15,7 +15,7 @@ use autodbUtil;
 
 use autodb_121;
 
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 
 my @joes=$autodb->get(collection=>'Person',name=>'Joe');
 is(scalar @joes,1,'get: Joe');

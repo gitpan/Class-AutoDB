@@ -1,5 +1,12 @@
 Revision history for Class-AutoDB
 
+1.29_01 2013-11-01
+	Working on FAILs seen by David Cantrell. Current theory: he runs 
+	multiple test instances in parallel, ans since tests all use same
+	database, they are trampling on each other.  Solution is to create
+	unique database for each test run.
+	
+
 1.28	2013-10-28
 	Fixed problems with manifest introduced in 1.27. Added dependency for
 	Test::CheckManifest

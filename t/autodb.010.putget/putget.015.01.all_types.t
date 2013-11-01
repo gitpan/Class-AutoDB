@@ -13,7 +13,7 @@ use putgetUtil; use AllTypes;
 
 my $get_type=@ARGV? shift @ARGV: 'get';
 
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 my($p)=$autodb->get(collection=>'Persistent');
 is($p->name,'persistent','persistent object');

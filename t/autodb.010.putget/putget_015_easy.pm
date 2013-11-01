@@ -35,7 +35,7 @@ sub init_test {
   defined $get_type or $get_type='get';
   defined $num_objects or $num_objects=2*3*5*2; # to cover the moduli adequately
   %factors=(string=>2,integer=>3,float=>5,object=>$num_objects);
-  $autodb=new Class::AutoDB(database=>'test'); # open database
+  $autodb=new Class::AutoDB(database=>testdb); # open database
   isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
   # get the objects. need them to set object_key in 'correct' objects

@@ -17,7 +17,7 @@ if (@ARGV==1 && $ARGV[0] eq 'count') {
   $first_case=shift @ARGV if @ARGV;
   $get_type=shift @ARGV if @ARGV;
 }
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 
 # make some hobbies
 my $rowing=new Thing(desc=>'rowing',id=>id_next());

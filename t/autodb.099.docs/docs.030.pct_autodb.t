@@ -5,7 +5,7 @@ use Test::More;
 use Class::AutoDB;
 use autodbUtil;
 
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 # %AUTODB unset. no base classes. therefore non-persistent

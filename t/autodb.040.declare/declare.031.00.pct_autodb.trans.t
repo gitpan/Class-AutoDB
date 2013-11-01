@@ -8,7 +8,7 @@ use autodbUtil;
 # 'put' test for transients.
 use PctAUTODB_Trans;
 
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 for my $class (qw(PctAUTODB_Trans_String PctAUTODB_Trans_Array

@@ -14,7 +14,7 @@ my $errstr=create_autodb_table;
 is($errstr,undef,'create _AutoDB table');
 tie_oid('create');
 
-my $dbh=DBI->connect("dbi:mysql:database=test",undef,undef,
+my $dbh=DBI->connect("dbi:mysql:database=".testdb,undef,undef,
 		     {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,});
 is($DBI::errstr,undef,'connect');
 Class::AutoDB::Serialize->dbh($dbh);

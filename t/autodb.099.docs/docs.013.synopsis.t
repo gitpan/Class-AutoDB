@@ -10,7 +10,7 @@ use autodbUtil;
 #   Dept(id int, name varchar(255)), EmpDept(emp_id int, dept_id int)
 use Class::AutoDB;
 use Person;
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 # this query retrieves the names of Joe's departments

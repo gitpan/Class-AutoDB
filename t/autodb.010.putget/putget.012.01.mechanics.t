@@ -17,7 +17,7 @@ defined $num_objects or $num_objects=1;
 defined $list_count or $list_count=1;
 defined $get_type or $get_type='get';
 
-my $autodb=new Class::AutoDB(database=>'test');  # open database
+my $autodb=new Class::AutoDB(database=>testdb);  # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 # make the objects - _init_self does all the work

@@ -21,7 +21,7 @@ my @object_names=qw(root cmp cmp lt lt le le eq eq ge ge gt gt ne ne);
 my $num_objects=scalar @object_names;
 defined $get_type or $get_type='get';
 
-my $autodb=new Class::AutoDB(database=>'test');  # open database
+my $autodb=new Class::AutoDB(database=>testdb);  # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 # make the objects

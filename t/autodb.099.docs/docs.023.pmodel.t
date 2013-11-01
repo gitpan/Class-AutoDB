@@ -6,7 +6,7 @@ use Class::AutoDB;
 use autodbUtil;
 
 use Person;
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 # make some objects and put them. call 'em all $joe since that's what's in docs

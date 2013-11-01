@@ -12,7 +12,7 @@ use Class::AutoDB;
 use putgetUtil; use SelfCircular;
 
 my $get_type=@ARGV? shift @ARGV: 'get';
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 # make some objects. self-circularity done in _init_self
 my $obj0=new SelfCircular(name=>'selfcircular 0',id=>id_next());
 my $obj1=new SelfCircular(name=>'selfcircular 1',id=>id_next());

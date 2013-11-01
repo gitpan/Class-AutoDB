@@ -14,7 +14,7 @@ my($num_objects,$get_type)=@ARGV;
 defined $num_objects or $num_objects=3;
 defined $get_type or $get_type='get';
 
-my $autodb=new Class::AutoDB(-database=>'test'); # open database
+my $autodb=new Class::AutoDB(-database=>testdb); # open database
 
 # some of these graphs are very big. make sure max_allowed_packet big enough
 if (max_allowed_packet_ok()) {

@@ -11,7 +11,7 @@ use autodbUtil;
 
 use autodb_119;
 
-my $autodb=new Class::AutoDB(database=>'test',create=>1); # create database
+my $autodb=new Class::AutoDB(database=>testdb,create=>1); # create database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 my $joe=new Person(-name=>'Joe',-sex=>'male');
 my $mary=new Person(-name=>'Mary',-sex=>'female');

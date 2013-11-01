@@ -8,7 +8,7 @@ use autodbUtil;
 # new features in verion 1.20
 use Class::AutoDB;
 use Person;
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 # retrieve objects using SQL

@@ -20,7 +20,7 @@ use Test::More;
 use Class::AutoDB;
 use autodbUtil;
 
-my $autodb=eval {new Class::AutoDB(database=>'test',create=>1)};
+my $autodb=eval {new Class::AutoDB(database=>testdb,create=>1)};
 is($@,'','create with full type names');
 
 done_testing();

@@ -17,7 +17,7 @@ defined $get_type or $get_type='get';
 defined $num_objects or $num_objects=2*3*5*2; # to cover the moduli adequately
 my $list_count=3;
 
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 my @all_correct_objects=

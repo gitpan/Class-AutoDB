@@ -2,6 +2,7 @@ use t::lib;
 use strict;
 use Test::More;
 use Class::AutoDB;
+use autodbUtil;
 use autodbRunTests;
 
 # Regression test: put large complex graph. breaks Dumper 2.121
@@ -14,7 +15,7 @@ use autodbRunTests;
 # value used here (6 MB) determined empirically. may have to change if graphs change!!
 # NG 10-03-08: turns out that changing max_allowed_packet has no effect despite
 #              what the MySQL documentations says...
-my $autodb=new Class::AutoDB(-database=>'test'); # open database
+my $autodb=new Class::AutoDB(-database=>testdb); # open database
 my $dbh=$autodb->dbh;
 my($name,$max_allowed_packet)=
   $dbh->selectrow_array(qq(SHOW VARIABLES LIKE 'max_allowed_packet'));

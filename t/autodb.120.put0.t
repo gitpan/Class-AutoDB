@@ -31,7 +31,7 @@ use Test::Deep;
 use Class::AutoDB;
 use autodbUtil;
 
-my $autodb=new Class::AutoDB(database=>'test',create=>1); # create database
+my $autodb=new Class::AutoDB(database=>testdb,create=>1); # create database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 # regression test starts here

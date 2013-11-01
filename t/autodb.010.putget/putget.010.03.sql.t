@@ -12,7 +12,7 @@ use putgetUtil; use Person; use Student; use Place; use School; use Thing;
 
 my $get_type=@ARGV? shift @ARGV: 'get';
 
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 # make some hobbies

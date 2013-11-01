@@ -19,7 +19,7 @@ use delUtil; use Person; use Student; use Place; use School; use Thing;
 my $put_type=@ARGV? shift @ARGV: 'put';
 
 # create AutoDB database & SDBM files
-my $autodb=new Class::AutoDB(database=>'test',create=>1); 
+my $autodb=new Class::AutoDB(database=>testdb,create=>1); 
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 tie_oid('create');
 

@@ -12,7 +12,7 @@ use autodbUtil;
 
 use autodb_119;
 
-my $autodb=new Class::AutoDB(-database=>'test');
+my $autodb=new Class::AutoDB(-database=>testdb);
 # retrieve and check
 my $cursor=$autodb->find(-collection=>'Person',-name=>'Joe');
 my $joe=$cursor->get->[0];

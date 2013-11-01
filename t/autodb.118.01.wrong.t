@@ -9,7 +9,7 @@ use autodbUtil;
 
 use autodb_118;
 
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 my($p)=$autodb->get(collection=>'HasName');
 is($p->name,'persistent','persistent object');

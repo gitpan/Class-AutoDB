@@ -11,7 +11,7 @@ use autodbUtil;
 
 use autodb_132;
 
-my $autodb=new Class::AutoDB(-database=>'test');
+my $autodb=new Class::AutoDB(-database=>testdb);
 
 # NG 12-11-29: only test DOES in perls > 5.10. 
 # Note: $^V returns real string in perls > 5.10, and v-string in earlier perls

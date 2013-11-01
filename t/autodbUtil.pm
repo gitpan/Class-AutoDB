@@ -30,7 +30,8 @@ use Exporter();
 
 our @ISA=qw(Exporter);
 our @EXPORT=qw(group groupmap gentle_uniq
-	       create_autodb_table autodb dbh oid2obj obj2oid all_objects
+	       create_autodb_table autodb dbh testdb $MYSQL_dir $SDBM_dir
+	       oid2obj obj2oid all_objects
 	       tie_oid %oid %oid2id %id2oid %obj2oid %oid2obj
 	       id id_restore id_next next_id
 	       reach reach_fetch reach_mark
@@ -46,11 +47,6 @@ our @EXPORT=qw(group groupmap gentle_uniq
 	       actual_tables actual_counts norm_counts actual_columns
 	       report report_pass report_fail called_from
 	     );
-# TODO: database name should be configurable
-# CAUTION: $test_db and $SDBM_dir duplicated in Build.PL
-our $test_db='test';
-our $SDBM_dir=File::Spec->catdir(cwd(),qw(t SDBM));
-
 # TODO: rewrite w/ Hash::AutoHash::MultiValued
 # group a list by categories returned by sub.
 # has to be declared before use, because of prototype
@@ -90,7 +86,7 @@ sub gentle_uniq {
 
 # used in serialize_ok tests. someday in Developer/Serialize tests
 sub create_autodb_table {
-  my $dbh=DBI->connect("dbi:mysql:database=test",undef,undef,
+  my $dbh=DBI->connect("dbi:mysql:database=".testdb(),undef,undef,
 		       {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,})
     or return $DBI::errstr;
   $dbh->do(qq(DROP TABLE IF EXISTS _AutoDB)) or return $dbh->errstr;
@@ -106,13 +102,39 @@ sub oid2obj {Class::AutoDB::Serialize->oid2obj(@_)}
 sub obj2oid {Class::AutoDB::Serialize->obj2oid(@_)}
 sub all_objects {values %{Class::AutoDB::Globals->instance()->oid2obj}}
 
+# NG 13-10-31: testdb created in 000.reqs and name stored in t/testdb
+our $testdb;
+sub testdb {
+  unless($testdb) {
+    my $file=File::Spec->catfile(qw(t testdb));
+    open(TESTDB,"< $file") or do {
+      my $diag=<<DIAG
+BAD NEWS: Unable to open file $file which contains test database name: $!
+Tests cannot proceed
+DIAG
+      ;
+      BAIL_OUT($diag);
+    };
+    $testdb=<TESTDB>;
+    chomp $testdb;
+    close TESTDB;
+  }
+  $testdb
+}
+# CAUTION: $SDBM_dir. $MYSQL_dir duplicated in Build.PL
+our $SDBM_dir=File::Spec->catdir(cwd(),qw(t SDBM));
+our $MYSQL_dir=File::Spec->catdir(cwd(),qw(t MYSQL));
 sub dbh {my $autodb=autodb; $autodb? $autodb->dbh: _dbh()}
 our $MYSQL_dbh;
+
 # NG 13-10-23: changed connect to use $ENV{USER} instead of undef. should be equivalent, but...
 sub _dbh {
-  $MYSQL_dbh or $MYSQL_dbh=DBI->connect
-    ("dbi:mysql:database=$test_db",$ENV{USER},undef,
+  $MYSQL_dbh or do {
+    my $testdb=testdb;
+    $MYSQL_dbh=DBI->connect
+    ("dbi:mysql:database=$testdb",$ENV{USER},undef,
      {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,});
+  };
 }
 # hashes below are exported.
 # %oid,%oid2id,%id2oid are persistent and refer to db objects

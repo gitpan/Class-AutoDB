@@ -19,14 +19,14 @@ my $object=new Place(name=>'test object original',id=>id_next());
 my($action)=@ARGV;
 if ($action=~/^s/i) {
   report_pass(drop_all(),"$labelprefix: database empty");
-  my $autodb=eval {new Class::AutoDB(database=>'test')};
+  my $autodb=eval {new Class::AutoDB(database=>testdb)};
   is($@,'',"$labelprefix: database created");
   my $correct_tables=correct_tables(qw(Place));
   ok_dbtables($correct_tables,"$labelprefix: NewColl not there, as expected");
   $test->test_put(object=>$object,correct_diffs=>1);
 } elsif ($action=~/^t/i) {
   eval {require NewExpand};		# do it here so 'test' will alter 'setup'
-  my $autodb=eval {new Class::AutoDB(database=>'test',alter=>0)};
+  my $autodb=eval {new Class::AutoDB(database=>testdb,alter=>0)};
   like($@,qr/memory registry adds/,"$labelprefix: new failed as expected");
   my $correct_tables=correct_tables(qw(Place));
   ok_dbtables($correct_tables,"$labelprefix: tables. NewColl not added as expected");

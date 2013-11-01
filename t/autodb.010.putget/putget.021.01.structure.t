@@ -12,7 +12,7 @@ use Class::AutoDB;
 use putgetUtil; use Structure;
 
 my $get_type=@ARGV? shift @ARGV: 'get';
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 # make some objects. structure set up in _init_self
 my $obj0=new Structure(name=>'structure 0',id=>id_next());
 my $obj1=new Structure(name=>'structure 1',id=>id_next());

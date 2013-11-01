@@ -13,7 +13,7 @@ use delUtil; use Person; use Student; use Place; use School; use Thing;
 
 my $first_case=@ARGV? shift: 0;
 my $del_type=@ARGV? shift: 'del';
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 
 # get the objects
 my @persons=$autodb->get(collection=>'Person');

@@ -13,7 +13,7 @@ use Class::AutoDB;
 use putgetUtil; use Persistent02; use NonPersistent02;
 
 my $get_type=@ARGV? shift @ARGV: 'get';
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 # %test_args, exported by putgetUtil, sets class2colls, coll2keys, label
 my $test=new autodbTestObject(%test_args);
 

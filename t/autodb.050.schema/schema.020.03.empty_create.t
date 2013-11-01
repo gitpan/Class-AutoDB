@@ -15,7 +15,7 @@ my($action)=@ARGV;
 if ($action=~/^s/i) {
   report_pass(drop_all(),"$labelprefix: database empty");
 } elsif ($action=~/^t/i) {
-  my $autodb=eval {new Class::AutoDB(database=>'test',create=>1)};
+  my $autodb=eval {new Class::AutoDB(database=>testdb,create=>1)};
   is($@,'',"$labelprefix: new");
   my $correct_tables=correct_tables(qw(Person));
   ok_dbtables($correct_tables,"$labelprefix: tables");

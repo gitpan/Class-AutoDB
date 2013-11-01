@@ -22,40 +22,41 @@ SKIP: {
   eval "use Test::mysqld $min_version";
   skip "socket test: Test::mysqld $min_version required",1 if $@;
 
-  # these variables needed for private MySQL instance
-  my $MYSQL_dir=File::Spec->catdir(qw(t MYSQL));
+  # first test with 'naked' DBI connect
+  my $dsn='DBI:mysql:dbname='.testdb;
+  # note("testing dbh from DBI connect dsn=$dsn");
+  my $dbh=DBI->connect($dsn);
+  report_fail($dbh,"DBI connect dsn=$dsn") or goto QUIT;
+  check_mysql($dbh,testdb) or goto QUIT;
+  pass("dbh from DBI connect dsn=$dsn");
+
+  # now test with AutoDB created the usual way
+  my $autodb=new Class::AutoDB(database=>testdb,create=>1);
+  report_fail($autodb,"AutoDB created the usual way") or goto QUIT;
+  # note("testing dbh from AutoDB created the usual way");
+  check_mysql($dbh,testdb) or goto QUIT;
+  pass("dbh from AutoDB created the usual way");
+
+  # now test with AutoDB created using socket
+  my $socket=find_socket();
+  if ($socket) {
+    my $autodb=new Class::AutoDB(socket=>$socket,database=>testdb,create=>1);
+    report_fail($autodb,"AutoDB created from socket") or goto QUIT;
+    # note('testing dbh from AutoDB created from socket');
+    check_mysql($autodb->dbh,testdb) or goto QUIT;
+    pass('dbh from AutoDB created from socket');
+  }
+
+  # now test with private MySQL instance
+  # variables needed for private MySQL instance
+  # MYSQL_dir defined in autodbUtil
+  # my $MYSQL_dir=File::Spec->catdir(qw(t MYSQL));
   my $etc_dir=File::Spec->catdir($MYSQL_dir,'etc');
   my $tmp_dir=File::Spec->catdir($MYSQL_dir,'tmp');
   my $var_dir=File::Spec->catdir($MYSQL_dir,'var');
   my $pid_file=File::Spec->catfile($tmp_dir,'mysqld.pid');
   my $socket_file=File::Spec->catfile($tmp_dir,'mysql.sock');
 
-  # first test with 'naked' DBI connect
-  my $dsn='DBI:mysql:dbname=test';
-  # note("testing dbh from DBI connect dsn=$dsn");
-  my $dbh=DBI->connect($dsn);
-  report_fail($dbh,"DBI connect dsn=$dsn") or goto QUIT;
-  check_mysql($dbh) or goto QUIT;
-  pass("dbh from DBI connect dsn=$dsn");
-
-  # now test with AutoDB created the usual way
-  my $autodb=new Class::AutoDB(database=>'test',create=>1);
-  report_fail($autodb,"AutoDB created the usual way") or goto QUIT;
-  # note("testing dbh from AutoDB created the usual way");
-  check_mysql($dbh) or goto QUIT;
-  pass("dbh from AutoDB created the usual way");
-
-  # now test with AutoDB created using socket
-  my $socket=find_socket();
-  if ($socket) {
-    my $autodb=new Class::AutoDB(socket=>$socket,database=>'test',create=>1);
-    report_fail($autodb,"AutoDB created from socket") or goto QUIT;
-    # note('testing dbh from AutoDB created from socket');
-    check_mysql($autodb->dbh) or goto QUIT;
-    pass('dbh from AutoDB created from socket');
-  }
-
-  # now test with private MySQL instance
   mkdir $MYSQL_dir unless -e $MYSQL_dir;
   report_fail(-d $MYSQL_dir,"create MYSQL directory $MYSQL_dir") or goto QUIT;
   my $mysqld=new Test::mysqld(my_cnf=>{'skip-networking'=>''},base_dir=>$MYSQL_dir,auto_start=>0);
@@ -80,13 +81,14 @@ SKIP: {
 			    {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,})};
     goto QUIT unless $dbh;
   }
-  # able to connect, so continue the test
-  my $private_autodb=new Class::AutoDB(socket=>$socket_file,user=>$user,database=>'test',create=>1);
-  report_fail($private_autodb,'AutoDB created from socket on private MySQL instance') 
-    or goto QUIT;
-  # note('testing dbh from AutoDB created from socket on private MySQL instance');
-  check_mysql($private_autodb->dbh) or goto QUIT;
-  pass('dbh from AutoDB created from socket on private MySQL instance');
+  # able to connect, so continue the test. Test::mysqld->start creates test database
+  check_mysql($dbh,'test') or goto QUIT;
+  pass('private MySQL instance');
+  
+  # note('testing AutoDB created from socket on private MySQL instance');
+  my $private_autodb=
+    new Class::AutoDB(socket=>$socket_file,user=>$user,database=>'test',create=>1);
+  ok($private_autodb,'AutoDB created from socket on private MySQL instance') or goto QUIT;
   
   # now make sure the public and private instances are different
   # note('testing public and private MySQL instances are different');
@@ -113,11 +115,11 @@ done_testing();
 # set $errstr and return undef
 # overkill here, but dry run for what we'll need in general case
 sub check_mysql {
-  my($dbh)=@_;
+  my($dbh,$testdb)=@_;
   # try to create database if necessary, then use it
   # don't worry about create-errors: may be able to use even if can't create
-  do_sql($dbh,qq(CREATE DATABASE IF NOT EXISTS test));
-  do_sql($dbh,qq(USE test)) or return undef;
+  do_sql($dbh,qq(CREATE DATABASE IF NOT EXISTS $testdb));
+  do_sql($dbh,qq(USE $testdb)) or return undef;
 
   # make sure we can do all necessary operations
   # create, alter, drop tables. insert, select, replace, update, select, delete

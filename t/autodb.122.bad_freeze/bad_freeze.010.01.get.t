@@ -13,11 +13,11 @@ use strict;
 use Test::More;
 use Test::Deep;
 use Class::AutoDB;
-# use autodbUtil;
+use autodbUtil;
 
 use Graph;
 
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 # regression test starts here

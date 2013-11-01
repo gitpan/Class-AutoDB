@@ -18,11 +18,11 @@ my $object=new Place(name=>'test object',id=>id_next());
 my($action)=@ARGV;
 if ($action=~/^s/i) {
   report_pass(drop_all(),"$labelprefix: database empty");
-  my $autodb=eval {new Class::AutoDB(database=>'test')};
+  my $autodb=eval {new Class::AutoDB(database=>testdb)};
   is($@,'',"$labelprefix: database created");
   $test->test_put(object=>$object,correct_diffs=>1);
 } elsif ($action=~/^t/i) {
-  my $autodb=eval {new Class::AutoDB(database=>'test',drop=>1)};
+  my $autodb=eval {new Class::AutoDB(database=>testdb,drop=>1)};
   is($@,'',"$labelprefix: new");
   my $correct_tables=correct_tables();
   ok_dbtables($correct_tables,"$labelprefix: tables");

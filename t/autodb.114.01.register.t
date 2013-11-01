@@ -17,7 +17,7 @@ use Class::AutoDB;
 use autodbUtil;
 
 # expects database to be setup by '00' test
-my $autodb=new Class::AutoDB(database=>'test',alter=>0);
+my $autodb=new Class::AutoDB(database=>testdb,alter=>0);
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 # drop collection tables manually 'just in case'

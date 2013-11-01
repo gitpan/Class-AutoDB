@@ -35,5 +35,6 @@ Dumper\.c$
 ^t/Developer
 ^t/SDBM
 ^t/MYSQL
+^t/testdb
 # ^MANIFEST\.SKIP$
 

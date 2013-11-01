@@ -12,7 +12,7 @@ use Class::AutoDB;
 use putgetUtil; use Transients;
 
 my $get_type=@ARGV? shift @ARGV: 'get';
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 
 # make some objects. sex & transients set in _init_self. 
 # DON'T change number of objects. tests depend on having 1 object per id%3

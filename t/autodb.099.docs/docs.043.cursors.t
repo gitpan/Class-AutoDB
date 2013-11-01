@@ -9,7 +9,7 @@ use autodbUtil;
 # test cursor methods documented in METHODS
 use Person;
 # create database so we can start fresh
-my $autodb=new Class::AutoDB(database=>'test',create=>1);
+my $autodb=new Class::AutoDB(database=>testdb,create=>1);
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 # make some objects and put 'em in the database, so we'll have something to query

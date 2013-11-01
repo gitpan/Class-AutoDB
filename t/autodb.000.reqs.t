@@ -23,25 +23,42 @@ diag("\nTesting $module $version, Perl $], $^X" );
 
 # my $autobd_version=$builder->build_requires->{'Class::AutoDB'};
 # my $dbd_version=$builder->build_requires->{'DBD::mysql'};
-my $ok=1;
+check_sdbm() or goto FAIL;
 
 # CAUTION: may not work to put DBD::mysql in prereqs. 
 #  in past, saw bug where if DBD::mysq not present, install tries to install 'DBD'
 #  which does not exist
-check_module('DBI') or $ok=0;
-check_module('DBD::mysql') or $ok=0;
+check_module('DBI') or goto FAIL;
+check_module('DBD::mysql') or goto FAIL;
 
-# TODO: database name should be configurable
-my $test_db='test';
-check_mysql($test_db) or $ok=0;
-check_sdbm() or $ok=0;
-
-if ($ok) {
-  pass('requirements are met');
+# before checking MySQL, generate database name and store in file
+my $testdb="testdb$$";
+my $file=File::Spec->catfile(qw(t testdb));
+if (open(TESTDB,"> $file")) {
+  print TESTDB "$testdb\n";
+  close TESTDB;
 } else {
-  pass('requirements tested ');
+  my $diag=<<DIAG
+Unable to create file $file which contains test database name: $!
+Test cannot proceed
+
+DIAG
+  ;
+  diag($diag);
+  goto FAIL;
 }
+
+check_mysql($testdb) or goto FAIL;
+
+# since we got here, all requirements are met
+pass('requirements are met');
 done_testing();
+exit();
+
+FAIL:
+print "pragma +stop_testing\n";
+done_testing();
+
 
 sub check_module {
   my($module,$version)=@_;
@@ -50,17 +67,15 @@ sub check_module {
   if ($@) {
     my $diag= <<DIAG
 
-
-These tests require that $module version $version or higher be installed.
-For some reason, the test driver does not reliably check this requirement.
-
-When loading this module, the test driver got the following error message:
+These tests require that $module version $version or higher be installed. If the
+test driver is unable to install the required module, it tries to run the test
+anyway. This is futile in most cases and leads to the error detected here:
 
 $@
 
 DIAG
       ;
-    report_fail($diag);
+    diag($diag);
     return undef;
   }
   1;
@@ -68,7 +83,7 @@ DIAG
 
 # check whether MySQl test database is accessible
 sub check_mysql {
-  my($test_db)=@_;
+  my $testdb=shift;
   # make sure we can talk to MySQL
   # NG 13-10-23: changed connect to use $ENV{USER} instead of undef. should be equivalent, but...
   my($dbh,$errstr);
@@ -78,10 +93,10 @@ sub check_mysql {
   $errstr=$@, goto FAIL if $@;
   goto FAIL unless $dbh;
 
-  # try to create database if necessary, then use it
-  # don't worry about create-errors: may be able to use even if can't create
-  $dbh->do(qq(CREATE DATABASE IF NOT EXISTS $test_db));
-  $dbh->do(qq(USE $test_db)) or goto FAIL;
+  # NG 13-10-31: can no longer be lax about ability to create database since
+  #  each test run creates unique database
+  $dbh->do(qq(CREATE DATABASE IF NOT EXISTS $testdb)) or goto FAIL;
+  $dbh->do(qq(USE $testdb)) or goto FAIL;
 
   # make sure we can do all necessary operations
   # create, alter, drop tables. insert, select, replace, update, select, delete
@@ -108,9 +123,9 @@ sub check_mysql {
   my $version=$dbh->selectrow_arrayref(qq(SELECT version())) or fail('get MySQL version');
   if ($version) {
     if (scalar(@$version)==1) {
-      diag('MySQL version ',$version->[0]);
+      diag('Testing MySQL version '.$version->[0]." database $testdb");
     } else {
-      fail('get MySQL version returned row with wrong nuber of columns. expected 1, got '.
+      fail('get MySQL version returned row with wrong number of columns. expected 1, got '.
 	   scalar(@$version));
     }
   }
@@ -119,7 +134,6 @@ sub check_mysql {
  FAIL:
   $errstr or $errstr=DBI->errstr;
   my $diag=<<DIAG
-
 
 These tests require that MySQL be running on 'localhost', that the user 
 running the tests can access MySQL without a password, and with these
@@ -135,7 +149,6 @@ $errstr
 DIAG
     ;
   diag($diag);
-  print "pragma +stop_testing\n";
   undef;
 }
 
@@ -145,16 +158,15 @@ sub check_sdbm {
   return 1 unless $errstr;
   my $diag=<<DIAG
 
-
 These tests require that the user running the tests can create and
 access access SDBM files. When verifying these capabilities, the test
 driver got the following error message:
 
 $errstr
+
 DIAG
     ;
   diag($diag);
-  print "pragma +stop_testing\n";
   undef;
 }
 sub _check_sdbm {
@@ -185,10 +197,3 @@ sub _check_sdbm {
   undef;
 }
 
-
-sub report_fail {
-  my($diag)=@_;
-  diag($diag);
-  print "pragma +stop_testing\n";
-  undef;
-}

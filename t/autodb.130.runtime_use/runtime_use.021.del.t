@@ -14,7 +14,7 @@ use autodbUtil;
                     # do NOT use the 'RunTimeUse' classes. that's the whole point!
 use CompileTimeUse; # use RunTimeUseOk; use RunTimeUseBad;
 
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 my($top)=$autodb->get(collection=>'HasName',name=>'top');
 my @objects=@{$top->list};
 my @oids=map {$autodb->oid($_)} @objects;

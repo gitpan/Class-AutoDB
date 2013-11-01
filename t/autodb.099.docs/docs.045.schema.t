@@ -9,7 +9,7 @@ use autodbUtil;
 # test methods in METHODS/Manage database schema
 
 # create AutoDB database and SBDM files so we start clean
-my $autodb=new Class::AutoDB(database=>'test',create=>1); 
+my $autodb=new Class::AutoDB(database=>testdb,create=>1); 
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 tie_oid('create');
 

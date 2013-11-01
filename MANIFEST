@@ -414,6 +414,7 @@ t/autodb.132.00.universal.t
 t/autodb.132.01.universal.t
 t/autodb.133.socket.t
 t/autodb.150.dropview.t
+t/autodb.999.cleanup.t
 t/autodb_118.pm
 t/autodb_119.pm
 t/autodb_121.pm

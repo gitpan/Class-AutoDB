@@ -9,7 +9,7 @@ use Class::AutoDB;
 use schemaUtil;
 
 drop_all();			# start clean. drop all tables
-my $autodb=eval {new Class::AutoDB(database=>'test',create=>1)};
+my $autodb=eval {new Class::AutoDB(database=>testdb,create=>1)};
 is($@,'','no collections: new');
 my $correct_tables=correct_tables();
 ok_dbtables($correct_tables,'no collections: tables');

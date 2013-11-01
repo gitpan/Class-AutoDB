@@ -25,6 +25,7 @@
             "ExtUtils::CBuilder" : "0",
             "Fcntl" : "1.11",
             "File::Basename" : "2.82",
+            "File::Path" : "2.09",
             "File::Spec" : "3.4",
             "File::Spec::Functions" : "3.4",
             "FindBin" : "1.5",
@@ -79,7 +80,7 @@
    "provides" : {
       "Class::AutoDB" : {
          "file" : "lib/Class/AutoDB.pm",
-         "version" : "1.28"
+         "version" : "1.29_01"
       },
       "Class::AutoDB::BaseTable" : {
          "file" : "lib/Class/AutoDB/BaseTable.pm",
@@ -154,11 +155,11 @@
          "version" : 0
       }
    },
-   "release_status" : "stable",
+   "release_status" : "testing",
    "resources" : {
       "license" : [
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "1.28"
+   "version" : "1.29_01"
 }

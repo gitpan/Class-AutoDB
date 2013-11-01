@@ -8,7 +8,7 @@ use Test::More;
 use Class::AutoDB;
 use schemaUtil; use Place;
 
-my $autodb=eval {new Class::AutoDB(database=>'test')};
+my $autodb=eval {new Class::AutoDB(database=>testdb)};
 is($@,'','add Place: new');
 my $correct_tables=correct_tables(qw(Person Place));
 ok_dbtables($correct_tables,'add Place: tables');

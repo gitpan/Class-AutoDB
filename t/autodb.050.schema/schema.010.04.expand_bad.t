@@ -8,7 +8,7 @@ use Test::More;
 use Class::AutoDB;
 use schemaUtil; use Expand; 
 
-my $autodb=eval {new Class::AutoDB(database=>'test')};
+my $autodb=eval {new Class::AutoDB(database=>testdb)};
 like($@,qr/expand/,'alter Person and add Expand: new failed as expected');
 my $correct_tables=correct_tables(qw(Person Place Thing));
 ok_dbtables($correct_tables,'alter Person and add Expand: tables unchanged as expected');

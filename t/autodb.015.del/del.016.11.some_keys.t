@@ -14,7 +14,7 @@ my($del_type)=@ARGV;
 my $num_objects=4*4;
 defined $del_type or $del_type='del';
 
-my $autodb=new Class::AutoDB(database=>'test');  # open database
+my $autodb=new Class::AutoDB(database=>testdb);  # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 my @classes=qw(B00L00 B01L00 B02L00 B03L00 B00L01 B01L01 B02L01 B03L01 B00L02 B01L02 B02L02 B03L02 B00L03 B01L03 B02L03 B03L03);

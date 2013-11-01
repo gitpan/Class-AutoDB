@@ -11,7 +11,7 @@ use autodbTestObject;
 use Class::AutoDB;
 use putgetUtil; use Person; use Student; use Place; use School; use Thing;
 
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 
 # retrieve Persons
 my @persons=$autodb->get(collection=>'Person');

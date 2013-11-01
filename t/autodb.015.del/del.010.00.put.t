@@ -22,7 +22,7 @@ if (@ARGV==1 && $ARGV[0] eq 'count') {
 # create AutoDB database & SDBM files
 my $autodb;
 unless($emit_count) {
-  $autodb=new Class::AutoDB(database=>'test',create=>1); 
+  $autodb=new Class::AutoDB(database=>testdb,create=>1); 
   isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
   tie_oid('create');
 }

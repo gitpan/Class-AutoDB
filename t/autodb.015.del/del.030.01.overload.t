@@ -12,7 +12,7 @@ use autodbTestObject;
 use Class::AutoDB;
 use delUtil; use Person; use Student; use Place; use School; use Thing;
 
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 my @persons=$autodb->get(collection=>'Person');

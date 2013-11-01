@@ -21,7 +21,7 @@ my $num_objects=scalar @object_names;
 defined $put_type or $put_type='put';
 
 # create AutoDB database & SDBM files
-my $autodb=new Class::AutoDB(database=>'test',create=>1); 
+my $autodb=new Class::AutoDB(database=>testdb,create=>1); 
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 tie_oid('create');
 

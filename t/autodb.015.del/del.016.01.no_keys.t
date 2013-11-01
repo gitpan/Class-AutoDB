@@ -14,7 +14,7 @@ my($num_objects,$del_type)=@ARGV;
 defined $num_objects or $num_objects=3;
 defined $del_type or $del_type='del';
 
-my $autodb=new Class::AutoDB(database=>'test');  # open database
+my $autodb=new Class::AutoDB(database=>testdb);  # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 my @objects=$autodb->get(collection=>'NoKeys');

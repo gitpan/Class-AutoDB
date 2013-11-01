@@ -14,7 +14,7 @@ use Class::AutoDB;
 use delUtil; use Person; use Student; use Place; use School; use Thing;
 
 # create AutoDB database & SDBM files
-my $autodb=new Class::AutoDB(database=>'test'); 
+my $autodb=new Class::AutoDB(database=>testdb); 
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 my $num_students=5;

@@ -11,7 +11,7 @@ use autodbTestObject;
 use Class::AutoDB;
 use putgetUtil;use Place;
 
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 
 # make 10 objects - Places are as good as any
 my @correct_objects=map {new Place(name=>"object $_",id=>id_next())} (0..9);

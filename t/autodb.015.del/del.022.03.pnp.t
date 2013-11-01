@@ -11,8 +11,8 @@ use Class::AutoDB;
 use delUtil; use Persistent02; use NonPersistent02;
 
 my $del_type=@ARGV? shift @ARGV: 'del';
-my $autodb=new Class::AutoDB(database=>'test'); # open database
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 my @objects=$autodb->get(collection=>'Persistent');

@@ -17,7 +17,7 @@ my($num_objects,$get_type)=@ARGV;
 defined $num_objects or $num_objects=3;
 defined $get_type or $get_type='get';
 
-my $autodb=new Class::AutoDB(-database=>'test'); # open database
+my $autodb=new Class::AutoDB(-database=>testdb); # open database
 
 do_test('chain');
 do_test('star');

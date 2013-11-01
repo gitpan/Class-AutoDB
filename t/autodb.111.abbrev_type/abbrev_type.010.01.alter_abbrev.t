@@ -20,7 +20,7 @@ use Test::More;
 use Class::AutoDB;
 use autodbUtil;
 
-my $autodb=eval {new Class::AutoDB(database=>'test',alter=>1)};
+my $autodb=eval {new Class::AutoDB(database=>testdb,alter=>1)};
 is($@,'','alter with abbreviated type names');
 
 done_testing();

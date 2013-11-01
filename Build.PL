@@ -24,6 +24,7 @@ my $builder = $class->new
 			'Data::Rmap' => 0.62,
 			'Fcntl' => 1.11,
 			'File::Basename' => 2.82,
+			'File::Path' => 2.09,
 			'File::Spec' => 3.40,
 			'File::Spec::Functions' => 3.40,
 			'FindBin' => 1.50,

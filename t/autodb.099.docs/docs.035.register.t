@@ -6,7 +6,7 @@ use Test::Deep;
 use Class::AutoDB;
 use autodbUtil;
 
-my $autodb=new Class::AutoDB(database=>'test'); 
+my $autodb=new Class::AutoDB(database=>testdb); 
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 # register 2 collections without class

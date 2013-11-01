@@ -6,8 +6,8 @@ use Class::AutoDB;
 use autodbUtil;
 
 # NG 11-01-07: added create=>1. longstanding bug
-# my $autodb=new Class::AutoDB(database=>'test'); # open database
-my $autodb=new Class::AutoDB(database=>'test',create=>1); # create database
+# my $autodb=new Class::AutoDB(database=>testdb); # open database
+my $autodb=new Class::AutoDB(database=>testdb,create=>1); # create database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 # %AUTODB unset. no base classes. therefore non-persistent

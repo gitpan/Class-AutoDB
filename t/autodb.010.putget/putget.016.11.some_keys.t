@@ -14,7 +14,7 @@ my($get_type)=@ARGV;
 my $num_objects=4*4;
 defined $get_type or $get_type='get';
 
-my $autodb=new Class::AutoDB(database=>'test');  # open database
+my $autodb=new Class::AutoDB(database=>testdb);  # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 # make the objects

@@ -11,7 +11,7 @@ use autodbTestObject;
 use Class::AutoDB;
 use delUtil; use Person; use Student; use Place; use School; use Thing;
 
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 my $count=$autodb->count(collection=>'Person',name=>'Bill');
 report_fail($count,'objects exist - probably have to rerun put script',__FILE__,__LINE__);

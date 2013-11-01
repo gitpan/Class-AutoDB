@@ -8,7 +8,7 @@ use Test::More;
 use Class::AutoDB;
 use schemaUtil; use Expand; 
  
-my $autodb=eval {new Class::AutoDB(database=>'test',alter=>1)};
+my $autodb=eval {new Class::AutoDB(database=>testdb,alter=>1)};
 is($@,'','alter Person and add Expand');
 expand_coll('Person',[qw(expand)],[qw(expand_list)]);
 

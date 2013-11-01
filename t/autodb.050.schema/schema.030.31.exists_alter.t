@@ -19,14 +19,14 @@ my $object=new Person(name=>'test object original',id=>id_next());
 my($action)=@ARGV;
 if ($action=~/^s/i) {
   report_pass(drop_all(),"$labelprefix: database empty");
-  my $autodb=eval {new Class::AutoDB(database=>'test')};
+  my $autodb=eval {new Class::AutoDB(database=>testdb)};
   is($@,'',"$labelprefix: database created");
   my $correct_tables=correct_tables(qw(Person));
   ok_dbtables($correct_tables,"$labelprefix: Expand not there, as expected");
   $test->test_put(object=>$object,correct_diffs=>{Person=>1,HasName=>1});
 } elsif ($action=~/^t/i) {
   eval {require Expand};		# do it here so 'test' will alter 'setup'
-  my $autodb=eval {new Class::AutoDB(database=>'test', alter=>undef)};
+  my $autodb=eval {new Class::AutoDB(database=>testdb, alter=>undef)};
   like($@,qr/collections are expanded/,"$labelprefix: new failed as expected");
   my $correct_tables=correct_tables(qw(Person));
   ok_dbtables($correct_tables,"$labelprefix: tables. Expand not added as expected");

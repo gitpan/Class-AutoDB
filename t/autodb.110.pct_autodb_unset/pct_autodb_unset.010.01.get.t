@@ -7,7 +7,7 @@ use autodbUtil;
 
 use Bottom; use Top;
 
-my $autodb=new Class::AutoDB(database=>'test'); # open database
+my $autodb=new Class::AutoDB(database=>testdb); # open database
 
 my $bottom=new Bottom(name=>'bottom',id=>id_next());
 my $top=new Top(name=>'top',id=>id_next());

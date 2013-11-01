@@ -21,7 +21,7 @@ defined $num_objects or $num_objects=3;
 defined $get_type or $get_type='get';
 defined $put_type or $put_type='put';
 
-my $autodb=new Class::AutoDB(database=>'test');  # open database
+my $autodb=new Class::AutoDB(database=>testdb);  # open database
 isa_ok($autodb,'Class::AutoDB','class is Class::AutoDB - sanity check');
 
 # %test_args, exported by putgetUtil, sets class2colls, coll2keys, label
