@@ -17,7 +17,7 @@ if (-e $file) {
   $ok=$dbh->do(qq(DROP DATABASE IF EXISTS $testdb));
   ok($ok,"drop database $testdb");
   $ok=unlink($file);
-  ok($ok,"delete testdb file $file");
+  ok($ok,"delete testdb file");
 }
 if (-e $SDBM_dir) {
   $ok=rmtree($SDBM_dir);
