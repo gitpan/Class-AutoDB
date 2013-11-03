@@ -80,7 +80,7 @@
    "provides" : {
       "Class::AutoDB" : {
          "file" : "lib/Class/AutoDB.pm",
-         "version" : "1.29_03"
+         "version" : "1.29_04"
       },
       "Class::AutoDB::BaseTable" : {
          "file" : "lib/Class/AutoDB/BaseTable.pm",
@@ -161,5 +161,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "1.29_03"
+   "version" : "1.29_04"
 }

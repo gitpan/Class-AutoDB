@@ -89,15 +89,18 @@ sub check_mysql {
   my($dbh,$errstr);
   my $testdb="testdb$$";
   my $user=$ENV{USER};
-  create_db($testdb,$user) or create_db($testdb,'root') or $testdb='test';
-  grant_db($testdb,$user,$user) or create_db($testdb,$user,'root');
-  # connect to testdb as current user
-  eval
-    {$dbh=DBI->connect("dbi:mysql:database=$testdb",$user,undef,
-		       {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,})};
-  $errstr="Can't connect to database $testdb as user $user. DBI->errstr=".DBI->errstr, goto FAIL
-    if $@ || !$dbh;;
-  
+  if (create_db($testdb,$user) || create_db($testdb,'root')) {
+    grant_db($testdb,$user,$user) or grant_db($testdb,$user,'root');
+    $dbh=connect_db($testdb,$user);
+  }
+  unless ($dbh) {
+    # try using 'test'
+    grant_db('test',$user,$user) or grant_db('test',$user,'root');
+    $dbh=connect_db('test',$user);
+    $errstr="Cannot connect to database $testdb or test as user $user. errstr=".DBI->errstr,
+      goto FAIL unless $dbh;
+    $testdb='test';
+  }
   # make sure we can do all necessary operations
   # create, alter, drop tables. insert, select, replace, update, select, delete
   # NG 10-11-19: ops on views needed for Babel, not AutoDB
@@ -170,6 +173,15 @@ sub grant_db {
 		       {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,})};
   return undef unless $dbh;
   $dbh->do(qq(GRANT ALL on $testdb.* TO $grantee\@localhost));
+}
+# connect to testdb as current user
+sub connect_db {
+  my($testdb,$user)=@_;
+  my $dbh;
+  eval
+    {$dbh=DBI->connect("dbi:mysql:database=$testdb",$user,undef,
+		       {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,})};
+  $dbh;
 }
 
 # SDBM files created in t/SDBM directory
