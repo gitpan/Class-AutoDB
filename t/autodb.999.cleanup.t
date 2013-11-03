@@ -12,10 +12,13 @@ my $ok;
 my $file=File::Spec->catfile(qw(t testdb));
 if (-e $file) {
   my $testdb=testdb;
-  my $dbh=DBI->connect("dbi:mysql:",$ENV{USER},undef,
-		       {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,});
-  $ok=$dbh->do(qq(DROP DATABASE IF EXISTS $testdb));
-  ok($ok,"drop database $testdb");
+  if ($testdb ne 'test') {
+    # 'test' database is pre-existing. don't drop
+    my $dbh=DBI->connect("dbi:mysql:",$ENV{USER},undef,
+			 {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,});
+    $ok=$dbh->do(qq(DROP DATABASE IF EXISTS $testdb));
+    ok($ok,"drop database $testdb");
+  }
   $ok=unlink($file);
   ok($ok,"delete testdb file");
 }

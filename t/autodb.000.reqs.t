@@ -31,8 +31,8 @@ check_sdbm() or goto FAIL;
 check_module('DBI') or goto FAIL;
 check_module('DBD::mysql') or goto FAIL;
 
-# before checking MySQL, generate database name and store in file
-my $testdb="testdb$$";
+my $testdb=check_mysql() or goto FAIL;
+# store database name in file
 my $file=File::Spec->catfile(qw(t testdb));
 if (open(TESTDB,"> $file")) {
   print TESTDB "$testdb\n";
@@ -47,9 +47,6 @@ DIAG
   diag($diag);
   goto FAIL;
 }
-
-check_mysql($testdb) or goto FAIL;
-
 # since we got here, all requirements are met
 pass('requirements are met');
 done_testing();
@@ -84,21 +81,23 @@ DIAG
 
 # check whether MySQl test database is accessible
 sub check_mysql {
-  my $testdb=shift;
-  # make sure we can talk to MySQL
-  # NG 13-10-23: changed connect to use $ENV{USER} instead of undef. should be equivalent, but...
+  # NG 13-11-03: try different ways of using MySQL
+  # 1) create new database as current user, else try as root, else use 'test'
+  # 2) grant permissions on database as current user or root. okay if this fails
+  # 3) connect to test database as current user
+  # FAIL if this doesn't work
   my($dbh,$errstr);
+  my $testdb="testdb$$";
+  my $user=$ENV{USER};
+  create_db($testdb,$user) or create_db($testdb,'root') or $testdb='test';
+  grant_db($testdb,$user,$user) or create_db($testdb,$user,'root');
+  # connect to testdb as current user
   eval
-    {$dbh=DBI->connect("dbi:mysql:",$ENV{USER},undef,
+    {$dbh=DBI->connect("dbi:mysql:database=$testdb",$user,undef,
 		       {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,})};
-  $errstr=$@, goto FAIL if $@;
-  goto FAIL unless $dbh;
-
-  # NG 13-10-31: can no longer be lax about ability to create database since
-  #  each test run creates unique database
-  $dbh->do(qq(CREATE DATABASE IF NOT EXISTS $testdb)) or goto FAIL;
-  $dbh->do(qq(USE $testdb)) or goto FAIL;
-
+  $errstr="Can't connect to database $testdb as user $user. DBI->errstr=".DBI->errstr, goto FAIL
+    if $@ || !$dbh;;
+  
   # make sure we can do all necessary operations
   # create, alter, drop tables. insert, select, replace, update, select, delete
   # NG 10-11-19: ops on views needed for Babel, not AutoDB
@@ -131,7 +130,7 @@ sub check_mysql {
     }
   }
   # since we made it here, we can do everything!
-  return 1;
+  return $testdb;
  FAIL:
   $errstr or $errstr=DBI->errstr;
   my $diag=<<DIAG
@@ -151,6 +150,26 @@ DIAG
     ;
   diag($diag);
   undef;
+}
+# create test database. errors handled by caller
+sub create_db {
+  my($testdb,$user)=@_;
+  my $dbh;
+  eval
+    {$dbh=DBI->connect("dbi:mysql:",$user,undef,
+		       {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,})};
+  return undef unless $dbh;
+  $dbh->do(qq(CREATE DATABASE IF NOT EXISTS $testdb));
+}
+# grant all to test database.  errors don't matter
+sub grant_db {
+  my($testdb,$grantee,$user)=@_;
+  my $dbh;
+  eval
+    {$dbh=DBI->connect("dbi:mysql:",$user,undef,
+		       {AutoCommit=>1, ChopBlanks=>1, PrintError=>0, PrintWarn=>0, Warn=>0,})};
+  return undef unless $dbh;
+  $dbh->do(qq(GRANT ALL on $testdb.* TO $grantee\@localhost));
 }
 
 # SDBM files created in t/SDBM directory
