@@ -1,5 +1,10 @@
 Revision history for Class-AutoDB
 
+1.29_05 2013-11-05
+	Still trying... 
+	Updated dependencies to skip DBD::mysql version 4.025, just released, 
+	which is FAILing everywhere
+
 1.29_04 2013-11-03
 	Still trying... 
 

@@ -29,7 +29,8 @@ check_sdbm() or goto FAIL;
 #  in past, saw bug where if DBD::mysq not present, install tries to install 'DBD'
 #  which does not exist
 check_module('DBI') or goto FAIL;
-check_module('DBD::mysql') or goto FAIL;
+# NG 13-11-05: hardcode DBD::mysql version, because Build.PL has complex prereq spec
+check_module('DBD::mysql',4.024) or goto FAIL;
 
 my $testdb=check_mysql() or goto FAIL;
 # store database name in file
