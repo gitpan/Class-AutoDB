@@ -1,5 +1,10 @@
 Revision history for Class-AutoDB
 
+1.29_06 2013-12-14
+	Revert 1.29_05. Dependency notation to skip specific version doesn't
+	work in compatibility mode
+	Looks like DBD::mysql 4.025 has been patched and is now passing
+
 1.29_05 2013-11-05
 	Still trying... 
 	Updated dependencies to skip DBD::mysql version 4.025, just released, 
@@ -11,7 +16,8 @@ Revision history for Class-AutoDB
 1.29_03 2013-11-03
 	Scheme introduced to fix Cantrell FAILs prevents Slaven Rezić from being
 	able to run tests... It appears that on his site, the test user can use
-	the 'test' database but not create new ones 
+	the 'test' database but not create new ones
+
 1.29_02 2013-11-02
 	Fixed FAIL logic in autodb.000.reqs.t introduced in 1.29_01
 

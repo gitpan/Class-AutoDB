@@ -19,7 +19,7 @@ my $builder = $class->new
    build_requires =>   {'Carp' => 1.20,
 			'Class::AutoClass' => 1.56,
 			'Cwd' => 3.40,
-			'DBD::mysql' => '>= 4.024, != 4.025',
+			'DBD::mysql' => 4.024,
 			'DBI' => 1.628,
 			'Data::Rmap' => 0.62,
 			'Fcntl' => 1.11,

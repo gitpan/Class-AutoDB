@@ -6,7 +6,7 @@ build_requires:
   Carp: 1.2
   Class::AutoClass: 1.56
   Cwd: 3.4
-  DBD::mysql: 0
+  DBD::mysql: 4.024
   DBI: 1.628
   Data::Rmap: 0.62
   ExtUtils::CBuilder: 0
@@ -37,7 +37,7 @@ configure_requires:
   Cwd: 3.4
   Module::Build: 0.4007
 dynamic_config: 1
-generated_by: 'Module::Build version 0.4007, CPAN::Meta::Converter version 2.120351'
+generated_by: 'Module::Build version 0.42, CPAN::Meta::Converter version 2.120351'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -46,7 +46,7 @@ name: Class-AutoDB
 provides:
   Class::AutoDB:
     file: lib/Class/AutoDB.pm
-    version: 1.29_05
+    version: 1.29_06
   Class::AutoDB::BaseTable:
     file: lib/Class/AutoDB/BaseTable.pm
     version: 0
@@ -101,13 +101,11 @@ provides:
   Class::AutoDB::Table:
     file: lib/Class/AutoDB/Table.pm
     version: 0
-recommends:
-  Test::mysqld: 0.17
 requires:
   Class::AutoClass: 1.56
   Class::Singleton: 1.4
   Cwd: 3.4
-  DBD::mysql: 0
+  DBD::mysql: '>= 4.024, != 4.025'
   DBI: 1.628
   Exporter: 5.68
   Fcntl: 1.11
@@ -121,4 +119,4 @@ requires:
   XSLoader: 0.15
 resources:
   license: http://dev.perl.org/licenses/
-version: 1.29_05
+version: 1.29_06

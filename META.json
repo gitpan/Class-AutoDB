@@ -4,7 +4,7 @@
       "Nat Goodman <natg@shore.net>"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "Module::Build version 0.4007, CPAN::Meta::Converter version 2.120351",
+   "generated_by" : "Module::Build version 0.42",
    "license" : [
       "perl_5"
    ],
@@ -15,11 +15,14 @@
    "name" : "Class-AutoDB",
    "prereqs" : {
       "build" : {
+         "recommends" : {
+            "Test::mysqld" : "0.17"
+         },
          "requires" : {
             "Carp" : "1.2",
             "Class::AutoClass" : "1.56",
             "Cwd" : "3.4",
-            "DBD::mysql" : 0,
+            "DBD::mysql" : "4.024",
             "DBI" : "1.628",
             "Data::Rmap" : "0.62",
             "ExtUtils::CBuilder" : "0",
@@ -55,14 +58,11 @@
          }
       },
       "runtime" : {
-         "recommends" : {
-            "Test::mysqld" : "0.17"
-         },
          "requires" : {
             "Class::AutoClass" : "1.56",
             "Class::Singleton" : "1.4",
             "Cwd" : "3.4",
-            "DBD::mysql" : 0,
+            "DBD::mysql" : ">= 4.024, != 4.025",
             "DBI" : "1.628",
             "Exporter" : "5.68",
             "Fcntl" : "1.11",
@@ -80,79 +80,61 @@
    "provides" : {
       "Class::AutoDB" : {
          "file" : "lib/Class/AutoDB.pm",
-         "version" : "1.29_05"
+         "version" : "1.29_06"
       },
       "Class::AutoDB::BaseTable" : {
-         "file" : "lib/Class/AutoDB/BaseTable.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/BaseTable.pm"
       },
       "Class::AutoDB::Collection" : {
-         "file" : "lib/Class/AutoDB/Collection.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/Collection.pm"
       },
       "Class::AutoDB::CollectionDiff" : {
-         "file" : "lib/Class/AutoDB/CollectionDiff.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/CollectionDiff.pm"
       },
       "Class::AutoDB::Connect" : {
-         "file" : "lib/Class/AutoDB/Connect.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/Connect.pm"
       },
       "Class::AutoDB::Cursor" : {
-         "file" : "lib/Class/AutoDB/Cursor.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/Cursor.pm"
       },
       "Class::AutoDB::Database" : {
-         "file" : "lib/Class/AutoDB/Database.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/Database.pm"
       },
       "Class::AutoDB::Dumper" : {
-         "file" : "lib/Class/AutoDB/Dumper.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/Dumper.pm"
       },
       "Class::AutoDB::Globals" : {
-         "file" : "lib/Class/AutoDB/Globals.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/Globals.pm"
       },
       "Class::AutoDB::ListTable" : {
-         "file" : "lib/Class/AutoDB/ListTable.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/ListTable.pm"
       },
       "Class::AutoDB::Object" : {
-         "file" : "lib/Class/AutoDB/Object.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/Object.pm"
       },
       "Class::AutoDB::Oid" : {
-         "file" : "lib/Class/AutoDB/Oid.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/Oid.pm"
       },
       "Class::AutoDB::OidDeleted" : {
-         "file" : "lib/Class/AutoDB/OidDeleted.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/OidDeleted.pm"
       },
       "Class::AutoDB::Registration" : {
-         "file" : "lib/Class/AutoDB/Registration.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/Registration.pm"
       },
       "Class::AutoDB::Registry" : {
-         "file" : "lib/Class/AutoDB/Registry.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/Registry.pm"
       },
       "Class::AutoDB::RegistryDiff" : {
-         "file" : "lib/Class/AutoDB/RegistryDiff.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/RegistryDiff.pm"
       },
       "Class::AutoDB::RegistryVersion" : {
-         "file" : "lib/Class/AutoDB/RegistryVersion.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/RegistryVersion.pm"
       },
       "Class::AutoDB::Serialize" : {
-         "file" : "lib/Class/AutoDB/Serialize.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/Serialize.pm"
       },
       "Class::AutoDB::Table" : {
-         "file" : "lib/Class/AutoDB/Table.pm",
-         "version" : 0
+         "file" : "lib/Class/AutoDB/Table.pm"
       }
    },
    "release_status" : "testing",
@@ -161,5 +143,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "1.29_05"
+   "version" : "1.29_06"
 }
