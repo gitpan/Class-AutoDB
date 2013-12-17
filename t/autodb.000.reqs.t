@@ -96,12 +96,14 @@ sub check_mysql {
   }
   unless ($dbh) {
     # try using 'test'
+    $testdb='test';
+    create_db($testdb,$user) or create_db($testdb,'root');
     grant_db('test',$user,$user) or grant_db('test',$user,'root');
     $dbh=connect_db('test',$user);
-    $errstr="Cannot connect to database $testdb or test as user $user. errstr=".DBI->errstr,
-      goto FAIL unless $dbh;
-    $testdb='test';
-  }
+    unless ($dbh) {
+      $errstr="Cannot connect to database $testdb or test as user $user. errstr=".DBI->errstr;
+      goto FAIL;
+    }}
   # make sure we can do all necessary operations
   # create, alter, drop tables. insert, select, replace, update, select, delete
   # NG 10-11-19: ops on views needed for Babel, not AutoDB

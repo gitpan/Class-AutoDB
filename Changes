@@ -1,5 +1,8 @@
 Revision history for Class-AutoDB
 
+1.29_07 2013-12-16
+	Last try to get Slaven Rezić working again
+
 1.29_06 2013-12-14
 	Revert 1.29_05. Dependency notation to skip specific version doesn't
 	work in compatibility mode
