@@ -49,7 +49,7 @@ my $builder = $class->new
    requires =>         {'Class::AutoClass' => 1.56,
 			'Class::Singleton' => 1.4,
 			'Cwd' => 3.40,
-			'DBD::mysql' => '>= 4.024, != 4.025',
+			'DBD::mysql' =>  4.024,
 			'DBI' => 1.628,
 			'Exporter' => 5.68,
 			'Fcntl' => 1.11,

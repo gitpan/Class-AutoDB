@@ -62,7 +62,7 @@
             "Class::AutoClass" : "1.56",
             "Class::Singleton" : "1.4",
             "Cwd" : "3.4",
-            "DBD::mysql" : ">= 4.024, != 4.025",
+            "DBD::mysql" : "4.024",
             "DBI" : "1.628",
             "Exporter" : "5.68",
             "Fcntl" : "1.11",
@@ -80,7 +80,7 @@
    "provides" : {
       "Class::AutoDB" : {
          "file" : "lib/Class/AutoDB.pm",
-         "version" : "1.29"
+         "version" : "1.291"
       },
       "Class::AutoDB::BaseTable" : {
          "file" : "lib/Class/AutoDB/BaseTable.pm"
@@ -143,5 +143,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "1.29"
+   "version" : "1.291"
 }

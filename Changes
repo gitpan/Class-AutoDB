@@ -6,6 +6,9 @@ ACTIVE MAINTENANCE and DEVELOPMENT ENDED!
        To continue work on this package, we will need to redo the Dumper patch.
        Too much work for too little gain.
 
+1.291	2013-12-18
+	Corrected a small problem in dependencies
+
 1.29	2013-12-18
 	Changes to tests only
         FAILs seen by David Cantrell on 1.28 caused by running of multiple test
