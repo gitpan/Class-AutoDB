@@ -1,34 +1,26 @@
 Revision history for Class-AutoDB
 
-1.29_07 2013-12-16
-	Last try to get Slaven Rezić working again
+ACTIVE MAINTENANCE and DEVELOPMENT ENDED!
+       While debugging 1.28 on Cantrell's machine, the compile of our patched
+       version of Data::Dumper generated 'deprecated' messages.
+       To continue work on this package, we will need to redo the Dumper patch.
+       Too much work for too little gain.
 
-1.29_06 2013-12-14
-	Revert 1.29_05. Dependency notation to skip specific version doesn't
-	work in compatibility mode
-	Looks like DBD::mysql 4.025 has been patched and is now passing
-
-1.29_05 2013-11-05
-	Still trying... 
-	Updated dependencies to skip DBD::mysql version 4.025, just released, 
-	which is FAILing everywhere
-
-1.29_04 2013-11-03
-	Still trying... 
-
-1.29_03 2013-11-03
-	Scheme introduced to fix Cantrell FAILs prevents Slaven Rezić from being
-	able to run tests... It appears that on his site, the test user can use
-	the 'test' database but not create new ones
-
-1.29_02 2013-11-02
-	Fixed FAIL logic in autodb.000.reqs.t introduced in 1.29_01
-
-1.29_01 2013-11-01
-	Working on FAILs seen by David Cantrell. Current theory: he runs 
-	multiple test instances in parallel, ans since tests all use same
-	database, they are trampling on each other.  Solution is to create
-	unique database for each test run.
+1.29	2013-12-18
+	Changes to tests only
+        FAILs seen by David Cantrell on 1.28 caused by running of multiple test
+	instances in parallel. All tests were using same database and trampling
+	on each other. Solution is to create unique database for each test run. 
+	There may also be cases where tester cannot create new databases. For
+	such cases, tests use preexisting 'test' database.
+	BUT...
+	While developing these changes, the only two CPAN testers that were
+	previously able to run the test suite (Slaven Rezić and David Cantrell)
+	no longer can do so.  
+	- For Cantrell, the issue I think is that the new version of DBD::mysql
+	  (4.025) is FAILing its tests, and Cantrell's tester also tries to
+	  install the latest version of dependencies.
+	- For Rezić, I have no clue.
 
 1.28	2013-10-28
 	Fixed problems with manifest introduced in 1.27. Added dependency for
